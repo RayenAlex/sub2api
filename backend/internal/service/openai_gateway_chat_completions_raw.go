@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -159,6 +160,12 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		}
 	}
 	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
+	if isGeminiRawChatCompletionsModel(upstreamModel) {
+		upstreamBody, err = normalizeGeminiRawChatToolSchemas(upstreamBody)
+		if err != nil {
+			return nil, fmt.Errorf("normalize Gemini raw chat tool schemas: %w", err)
+		}
+	}
 
 	logger.L().Debug("openai chat_completions raw: forwarding without protocol conversion",
 		zap.Int64("account_id", account.ID),
@@ -242,6 +249,85 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		result.UpstreamEndpoint = grokChatRawEndpoint
 	}
 	return result, forwardErr
+}
+
+// isGeminiRawChatCompletionsModel restricts schema normalization to the raw
+// OpenAI-compatible route for Gemini models. Other compatible upstreams retain
+// their original request payload unchanged.
+func isGeminiRawChatCompletionsModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gemini-")
+}
+
+// normalizeGeminiRawChatToolSchemas supplies the `items` schema that Gemini
+// function declarations require for every array parameter. OpenAI-compatible
+// clients may omit it for an unconstrained array; Gemini rejects that form.
+func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("decode raw chat completion request: %w", err)
+	}
+
+	rawTools, ok := payload["tools"].([]any)
+	if !ok {
+		return body, nil
+	}
+
+	changed := false
+	for _, rawTool := range rawTools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		function, ok := tool["function"].(map[string]any)
+		if !ok {
+			continue
+		}
+		parameters, ok := function["parameters"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if addMissingGeminiArrayItems(parameters) {
+			changed = true
+		}
+	}
+	if !changed {
+		return body, nil
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("encode normalized raw chat completion request: %w", err)
+	}
+	return normalized, nil
+}
+
+func addMissingGeminiArrayItems(value any) bool {
+	switch node := value.(type) {
+	case map[string]any:
+		changed := false
+		if typeName, _ := node["type"].(string); strings.EqualFold(typeName, "array") {
+			if items, exists := node["items"]; !exists || items == nil {
+				node["items"] = map[string]any{"type": "string"}
+				changed = true
+			}
+		}
+		for _, child := range node {
+			if addMissingGeminiArrayItems(child) {
+				changed = true
+			}
+		}
+		return changed
+	case []any:
+		changed := false
+		for _, child := range node {
+			if addMissingGeminiArrayItems(child) {
+				changed = true
+			}
+		}
+		return changed
+	default:
+		return false
+	}
 }
 
 func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, error) {
