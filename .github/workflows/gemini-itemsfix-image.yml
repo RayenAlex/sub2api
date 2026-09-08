@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_VERSION: 0.2.1-gemini-itemsfix-20260905
+  IMAGE_VERSION: 0.2.1-gemini-schema-fix-20260908
 
 jobs:
   regression-test:
@@ -30,8 +30,8 @@ jobs:
       - name: Verify Gemini raw chat schema normalization
         working-directory: backend
         run: >-
-          go test -tags geminirawtest ./internal/service
-          -run '^TestNormalizeGeminiRawChatToolSchemasAddsItemsToBareNestedArrays$'
+          go test ./internal/service
+          -run '^TestNormalizeGeminiRawChatToolSchemas'
           -count=1
 
   build-image:

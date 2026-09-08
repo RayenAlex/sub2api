@@ -258,9 +258,9 @@ func isGeminiRawChatCompletionsModel(model string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gemini-")
 }
 
-// normalizeGeminiRawChatToolSchemas supplies the `items` schema that Gemini
-// function declarations require for every array parameter. OpenAI-compatible
-// clients may omit it for an unconstrained array; Gemini rejects that form.
+// normalizeGeminiRawChatToolSchemas adapts OpenAI-compatible function schemas
+// to Gemini's stricter Schema validation: arrays need `items`, while
+// `properties` and `required` are object-only fields.
 func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -286,7 +286,7 @@ func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
 		if !ok {
 			continue
 		}
-		if addMissingGeminiArrayItems(parameters) {
+		if normalizeGeminiSchemaNode(parameters) {
 			changed = true
 		}
 	}
@@ -301,32 +301,87 @@ func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
 	return normalized, nil
 }
 
-func addMissingGeminiArrayItems(value any) bool {
+func normalizeGeminiSchemaNode(value any) bool {
 	switch node := value.(type) {
 	case map[string]any:
 		changed := false
-		if typeName, _ := node["type"].(string); strings.EqualFold(typeName, "array") {
+		effectiveType, hasType := effectiveGeminiSchemaType(node)
+		if hasType && strings.EqualFold(effectiveType, "array") {
 			if items, exists := node["items"]; !exists || items == nil {
 				node["items"] = map[string]any{"type": "string"}
 				changed = true
 			}
 		}
-		for _, child := range node {
-			if addMissingGeminiArrayItems(child) {
+		if !hasType {
+			if _, hasProperties := node["properties"]; hasProperties {
+				node["type"] = "object"
+				effectiveType = "object"
 				changed = true
+			}
+		} else if !strings.EqualFold(effectiveType, "object") {
+			if _, exists := node["properties"]; exists {
+				delete(node, "properties")
+				changed = true
+			}
+			if _, exists := node["required"]; exists {
+				delete(node, "required")
+				changed = true
+			}
+		}
+		for _, key := range []string{"properties", "items", "additionalProperties"} {
+			if child, exists := node[key]; exists {
+				if key == "properties" {
+					if childProperties, ok := child.(map[string]any); ok {
+						for _, child := range childProperties {
+							if normalizeGeminiSchemaNode(child) {
+								changed = true
+							}
+						}
+					}
+				} else if key == "additionalProperties" {
+					if _, isBool := child.(bool); !isBool && normalizeGeminiSchemaNode(child) {
+						changed = true
+					}
+				} else if normalizeGeminiSchemaNode(child) {
+					changed = true
+				}
 			}
 		}
 		return changed
 	case []any:
 		changed := false
 		for _, child := range node {
-			if addMissingGeminiArrayItems(child) {
+			if normalizeGeminiSchemaNode(child) {
 				changed = true
 			}
 		}
 		return changed
 	default:
 		return false
+	}
+}
+
+func effectiveGeminiSchemaType(node map[string]any) (string, bool) {
+	switch valueType := node["type"].(type) {
+	case string:
+		return valueType, true
+	case []any:
+		selected := ""
+		for _, rawType := range valueType {
+			typeName, ok := rawType.(string)
+			if !ok {
+				continue
+			}
+			if selected == "" || strings.EqualFold(typeName, "object") {
+				selected = typeName
+			}
+		}
+		if selected == "" {
+			return "", false
+		}
+		return selected, true
+	default:
+		return "", false
 	}
 }
 
