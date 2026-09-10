@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_VERSION: 0.2.1-gemini-schema-fix-20260908
+  IMAGE_VERSION: 0.2.1-opencode-session-affinity-20260910
 
 jobs:
   regression-test:
@@ -31,7 +31,7 @@ jobs:
         working-directory: backend
         run: >-
           go test ./internal/service
-          -run '^TestNormalizeGeminiRawChatToolSchemas'
+          -run '^(TestNormalizeGeminiRawChatToolSchemas|TestApplyOpenCodeSessionAffinityHeaderRequiresExplicitAccountOptIn|TestOpenCodeSessionAffinityForwardedToExplicitlyTrustedCPAOnAllOpenAIPaths)$'
           -count=1
 
   build-image:

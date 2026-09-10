@@ -113,6 +113,41 @@ func TestApplyOpenCodeSessionHeaderTrustBoundary(t *testing.T) {
 	}
 }
 
+func TestApplyOpenCodeSessionAffinityHeaderRequiresExplicitAccountOptIn(t *testing.T) {
+	newContext := func(header, value string) *gin.Context {
+		c := newOpenCodeSessionTestContext(t, "")
+		c.Request.Header.Set(header, value)
+		return c
+	}
+
+	t.Run("disabled account does not forward to CPA", func(t *testing.T) {
+		account := openCodeSessionTestAccount("https://cpa.example.test/v1")
+		headers := http.Header{}
+		applyOpenCodeSessionAffinityHeader(newContext(openCodeSessionAffinityHeader, "session-disabled"), account, headers)
+		require.Empty(t, headers.Get(openCodeSessionAffinityHeader))
+	})
+
+	t.Run("enabled account canonicalizes caller session and overrides static value", func(t *testing.T) {
+		account := openCodeSessionTestAccount("https://cpa.example.test/v1")
+		account.Credentials[forwardOpenCodeSessionAffinityCredentialKey] = true
+		headers := http.Header{openCodeSessionAffinityHeader: []string{"static-account-value"}}
+		applyOpenCodeSessionAffinityHeader(newContext(openCodeNativeSessionHeader, "  conversation-123  "), account, headers)
+		requireSingleHeader(t, headers, openCodeSessionAffinityHeader, "conversation-123")
+	})
+}
+
+func requireSingleHeader(t *testing.T, headers http.Header, name, want string) {
+	t.Helper()
+	count := 0
+	for key, values := range headers {
+		if strings.EqualFold(key, name) {
+			count += len(values)
+			require.Equal(t, []string{want}, values)
+		}
+	}
+	require.Equal(t, 1, count)
+}
+
 func TestOpenCodeSessionForwardedByResponsesBuildersAfterAccountOverride(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := openCodeSessionTestService()
@@ -145,6 +180,57 @@ func TestOpenCodeSessionForwardedByResponsesBuildersAfterAccountOverride(t *test
 			requireSingleOpenCodeSessionHeader(t, req.Header, "conversation-456")
 		})
 	}
+}
+
+func TestOpenCodeSessionAffinityForwardedToExplicitlyTrustedCPAOnAllOpenAIPaths(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := openCodeSessionTestService()
+	account := openCodeSessionTestAccount("https://cpa.example.test/v1")
+	account.Credentials[forwardOpenCodeSessionAffinityCredentialKey] = true
+	body := []byte(`{"model":"gpt-5","input":"hello"}`)
+
+	newContext := func() *gin.Context {
+		c := newOpenCodeSessionTestContext(t, "")
+		c.Request.Header.Set(openCodeSessionIDHeader, "conversation-cpa-456")
+		return c
+	}
+
+	tests := []struct {
+		name  string
+		build func(*gin.Context) (*http.Request, error)
+	}{
+		{
+			name: "normal responses",
+			build: func(c *gin.Context) (*http.Request, error) {
+				return svc.buildUpstreamRequest(context.Background(), c, account, body, "token", false, "", false)
+			},
+		},
+		{
+			name: "passthrough responses",
+			build: func(c *gin.Context) (*http.Request, error) {
+				return svc.buildUpstreamRequestOpenAIPassthrough(context.Background(), c, account, body, "token")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := tt.build(newContext())
+			require.NoError(t, err)
+			requireSingleHeader(t, req.Header, openCodeSessionAffinityHeader, "conversation-cpa-456")
+		})
+	}
+
+	upstream := &openCodeSessionHTTPUpstream{}
+	svc.httpUpstream = upstream
+	resp, err := svc.sendCCUpstreamRequest(
+		context.Background(), newContext(), account,
+		"https://cpa.example.test/v1/chat/completions", []byte(`{"model":"gpt-5"}`),
+		false, "token", "", "",
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.NotNil(t, upstream.request)
+	requireSingleHeader(t, upstream.request.Header, openCodeSessionAffinityHeader, "conversation-cpa-456")
 }
 
 func TestOpenCodeSessionMissingCallerValueKeepsExistingOverrideBehavior(t *testing.T) {
