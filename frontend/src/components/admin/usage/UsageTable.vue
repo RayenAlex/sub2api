@@ -205,6 +205,17 @@
           </div>
         </template>
 
+        <template #cell-cache_hit_rate="{ row }">
+          <span
+            data-testid="cache-hit-rate"
+            :title="t('usage.cacheHitRateHint')"
+            class="inline-flex min-w-14 justify-center rounded px-2 py-1 text-sm font-semibold tabular-nums"
+            :class="cacheHitRateClass(row)"
+          >
+            {{ formatCacheHitRate(row) }}
+          </span>
+        </template>
+
         <template #cell-cost="{ row }">
           <div class="text-sm">
             <div class="flex items-center gap-1.5">
@@ -621,6 +632,27 @@ const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
+
+const cacheHitRate = (row: Pick<AdminUsageLog, 'input_tokens' | 'cache_creation_tokens' | 'cache_read_tokens'>): number | null => {
+  const input = Math.max(0, Number(row.input_tokens) || 0)
+  const cacheCreation = Math.max(0, Number(row.cache_creation_tokens) || 0)
+  const cacheRead = Math.max(0, Number(row.cache_read_tokens) || 0)
+  const totalPrompt = input + cacheCreation + cacheRead
+  return totalPrompt > 0 ? (cacheRead / totalPrompt) * 100 : null
+}
+
+const formatCacheHitRate = (row: AdminUsageLog): string => {
+  const rate = cacheHitRate(row)
+  return rate === null ? '-' : `${rate.toFixed(1)}%`
+}
+
+const cacheHitRateClass = (row: AdminUsageLog): string => {
+  const rate = cacheHitRate(row)
+  if (rate === null) return 'bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-gray-400'
+  if (rate >= 80) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+  if (rate >= 50) return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+  return 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+}
 
 const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
   const requested = row.reasoning_effort?.trim() || ''

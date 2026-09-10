@@ -479,6 +479,38 @@ describe('admin UsageView request ID column visibility', () => {
     vi.useRealTimers()
   })
 
+  it('shows the cache-hit-rate column by default between tokens and cost', async () => {
+    const wrapper = mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          UsageStatsCards: true,
+          UsageFilters: UsageFiltersStub,
+          UsageTable: UsageTableStub,
+          UsageExportProgress: true,
+          UsageCleanupDialog: true,
+          UserBalanceHistoryModal: true,
+          AuditLogModal: true,
+          Pagination: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          TokenUsageTrend: true,
+          ModelDistributionChart: true,
+          GroupDistributionChart: true,
+          EndpointDistributionChart: true,
+          UserTokenRanking: true,
+        },
+      },
+    })
+    await wrapper.vm.$nextTick()
+
+    const columns = wrapper.findComponent(UsageTableStub).props('columns') as Array<{ key: string }>
+    const tokensIndex = columns.findIndex((column) => column.key === 'tokens')
+    expect(columns[tokensIndex + 1]?.key).toBe('cache_hit_rate')
+    expect(columns[tokensIndex + 2]?.key).toBe('cost')
+  })
+
   it('keeps request ID hidden by default and allows enabling it from column settings', async () => {
     const wrapper = mount(UsageView, {
       global: {

@@ -92,6 +92,7 @@ const DataTableStub = {
         <slot name="cell-reasoning_effort" :row="row" :value="row.reasoning_effort" />
         <slot name="cell-billing_mode" :row="row" />
         <slot name="cell-tokens" :row="row" />
+        <slot name="cell-cache_hit_rate" :row="row" />
         <slot name="cell-cost" :row="row" />
         <slot name="cell-request_id" :row="row" />
         <slot name="cell-upstream_request_id" :row="row" />
@@ -141,6 +142,43 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it('shows each token request cache-hit rate using the billing token buckets', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [
+          {
+            ...baseImageRow,
+            request_id: 'req-cache-hit',
+            billing_mode: 'token',
+            input_tokens: 100,
+            cache_creation_tokens: 100,
+            cache_read_tokens: 800,
+          },
+          {
+            ...baseImageRow,
+            request_id: 'req-no-prompt-tokens',
+            billing_mode: 'token',
+          },
+        ],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const rates = wrapper.findAll('[data-testid="cache-hit-rate"]')
+    expect(rates).toHaveLength(2)
+    expect(rates[0].text()).toContain('80.0%')
+    expect(rates[1].text()).toBe('-')
   })
 
   it('marks only usage rows that actually applied long-context billing', () => {
