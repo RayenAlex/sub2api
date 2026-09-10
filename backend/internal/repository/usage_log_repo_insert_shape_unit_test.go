@@ -129,7 +129,7 @@ func TestPrepareUsageLogInsert_UpstreamRequestIDArgWiring(t *testing.T) {
 	})
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
 
-	idx := len(prepared.args) - 4
+	idx := len(prepared.args) - 5
 	arg, ok := prepared.args[idx].(sql.NullString)
 	require.True(t, ok, "upstream_request_id arg should be sql.NullString, got %T", prepared.args[idx])
 	require.True(t, arg.Valid)
@@ -142,4 +142,51 @@ func TestPrepareUsageLogInsert_UpstreamRequestIDArgWiring(t *testing.T) {
 	require.False(t, nullArg.Valid, "absent upstream request id must be NULL")
 
 	require.Contains(t, usageLogSelectColumns, "upstream_request_id")
+}
+
+func TestPrepareUsageLogInsert_CacheDiagnosticArgWiring(t *testing.T) {
+	diagnostic := &service.OpenCodeCacheDiagnostic{
+		Version:         1,
+		RequestBodyHMAC: "body-hmac",
+		MessageRoles:    []string{"system", "user"},
+		MessageCount:    2,
+	}
+	prepared := prepareUsageLogInsert(&service.UsageLog{
+		UserID:          1,
+		APIKeyID:        2,
+		RequestID:       "client:cache-diagnostic",
+		Model:           "gpt-5",
+		CacheDiagnostic: diagnostic,
+		CreatedAt:       time.Now().UTC(),
+	})
+	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
+
+	idx := len(prepared.args) - 3
+	arg, ok := prepared.args[idx].(sql.NullString)
+	require.True(t, ok, "cache_diagnostic arg should be sql.NullString, got %T", prepared.args[idx])
+	require.True(t, arg.Valid)
+	require.JSONEq(t, diagnostic.String(), arg.String)
+	require.Equal(t, "jsonb", usageLogInsertArgTypes[idx])
+
+	absent := prepareUsageLogInsert(&service.UsageLog{UserID: 1, APIKeyID: 2, RequestID: "client:no-cache-diagnostic", Model: "gpt-5", CreatedAt: time.Now().UTC()})
+	nullArg, ok := absent.args[idx].(sql.NullString)
+	require.True(t, ok)
+	require.False(t, nullArg.Valid)
+}
+
+func TestUsageLogInsertQueries_IncludeCacheDiagnostic(t *testing.T) {
+	require.Contains(t, usageLogSelectColumns, "cache_diagnostic")
+
+	prepared := prepareUsageLogInsert(&service.UsageLog{
+		UserID: 1, APIKeyID: 2, RequestID: "client:cache-diagnostic-query", Model: "gpt-5",
+		CacheDiagnostic: &service.OpenCodeCacheDiagnostic{Version: 1, RequestBodyHMAC: "body-hmac"},
+		CreatedAt:       time.Now().UTC(),
+	})
+	key := usageLogBatchKey("client:cache-diagnostic-query", 2)
+
+	batchQuery, _ := buildUsageLogBatchInsertQuery([]string{key}, map[string]usageLogInsertPrepared{key: prepared})
+	require.Contains(t, batchQuery, "cache_diagnostic")
+
+	bestEffortQuery, _ := buildUsageLogBestEffortInsertQuery([]usageLogInsertPrepared{prepared})
+	require.Contains(t, bestEffortQuery, "cache_diagnostic")
 }

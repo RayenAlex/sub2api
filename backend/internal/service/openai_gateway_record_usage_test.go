@@ -3181,3 +3181,37 @@ func TestOpenAIGatewayServiceRecordUsage_ServiceTierNeverRaisedByUpstreamRespons
 	require.NoError(t, calcErr)
 	require.InDelta(t, baseCost.TotalCost, usageRepo.lastLog.TotalCost, 1e-10)
 }
+
+func TestOpenAIGatewayServiceRecordUsage_CopiesOpenCodeCacheDiagnostic(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	billingRepo := &openAIRecordUsageBillingRepoStub{result: &UsageBillingApplyResult{Applied: true}}
+	svc := newOpenAIRecordUsageServiceWithBillingRepoForTest(
+		usageRepo,
+		billingRepo,
+		&openAIRecordUsageUserRepoStub{},
+		&openAIRecordUsageSubRepoStub{},
+		nil,
+	)
+	diagnostic := &OpenCodeCacheDiagnostic{
+		Version:         1,
+		RequestBodyHMAC: "body-hmac",
+		MessageRoles:    []string{"system", "user"},
+		MessageCount:    2,
+	}
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID:       "resp-cache-diagnostic",
+			Model:           "gpt-5.1",
+			Duration:        time.Second,
+			CacheDiagnostic: diagnostic,
+		},
+		APIKey:  &APIKey{ID: 1001, Quota: 100, Group: &Group{RateMultiplier: 1}},
+		User:    &User{ID: 2001},
+		Account: &Account{ID: 3001, Type: AccountTypeAPIKey},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, diagnostic, usageRepo.lastLog.CacheDiagnostic)
+}

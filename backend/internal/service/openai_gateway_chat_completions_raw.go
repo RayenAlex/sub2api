@@ -248,6 +248,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		addOpenAIUsage(&result.Usage, bridgeUsage)
 		result.UpstreamEndpoint = grokChatRawEndpoint
 	}
+	if result != nil {
+		result.CacheDiagnostic = openCodeCacheDiagnosticFromContext(c)
+	}
 	return result, forwardErr
 }
 

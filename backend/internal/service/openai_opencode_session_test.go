@@ -185,8 +185,10 @@ func TestOpenCodeSessionForwardedByResponsesBuildersAfterAccountOverride(t *test
 func TestOpenCodeSessionAffinityForwardedToExplicitlyTrustedCPAOnAllOpenAIPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := openCodeSessionTestService()
+	svc.cfg.JWT.Secret = "cache-diagnostic-test-secret"
 	account := openCodeSessionTestAccount("https://cpa.example.test/v1")
 	account.Credentials[forwardOpenCodeSessionAffinityCredentialKey] = true
+	account.Credentials[openCodeCacheDiagnosticsCredentialKey] = true
 	body := []byte(`{"model":"gpt-5","input":"hello"}`)
 
 	newContext := func() *gin.Context {
@@ -222,8 +224,9 @@ func TestOpenCodeSessionAffinityForwardedToExplicitlyTrustedCPAOnAllOpenAIPaths(
 
 	upstream := &openCodeSessionHTTPUpstream{}
 	svc.httpUpstream = upstream
+	c := newContext()
 	resp, err := svc.sendCCUpstreamRequest(
-		context.Background(), newContext(), account,
+		context.Background(), c, account,
 		"https://cpa.example.test/v1/chat/completions", []byte(`{"model":"gpt-5"}`),
 		false, "token", "", "",
 	)
@@ -231,6 +234,12 @@ func TestOpenCodeSessionAffinityForwardedToExplicitlyTrustedCPAOnAllOpenAIPaths(
 	require.NoError(t, resp.Body.Close())
 	require.NotNil(t, upstream.request)
 	requireSingleHeader(t, upstream.request.Header, openCodeSessionAffinityHeader, "conversation-cpa-456")
+	diagnostic := openCodeCacheDiagnosticFromContext(c)
+	require.NotNil(t, diagnostic)
+	require.Equal(t,
+		openCodeCacheDiagnosticHMAC(openCodeCacheDiagnosticKey(svc.cfg), []byte(upstream.request.Header.Get(openCodeSessionAffinityHeader))),
+		diagnostic.ForwardedSessionAffinityHMAC,
+	)
 }
 
 func TestOpenCodeSessionMissingCallerValueKeepsExistingOverrideBehavior(t *testing.T) {

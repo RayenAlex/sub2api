@@ -84,6 +84,7 @@ var usageLogInsertArgTypes = [...]string{
 	"numeric",     // account_stats_cost
 	"text",        // upstream_request_id
 	"text",        // session_id
+	"jsonb",       // cache_diagnostic
 	"boolean",     // native_compaction_v2
 	"timestamptz", // created_at
 }
@@ -285,6 +286,7 @@ func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor,
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		) VALUES (
@@ -293,7 +295,7 @@ func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor,
 			$12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24, $25,
-			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62
+			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63
 		)
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
 		RETURNING id, created_at
@@ -745,6 +747,7 @@ func buildUsageLogBatchInsertQuery(keys []string, preparedByKey map[string]usage
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		) AS (VALUES `)
@@ -1008,6 +1011,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		) AS (VALUES `)
@@ -1098,6 +1102,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		)
@@ -1162,6 +1167,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		FROM input
@@ -1234,6 +1240,7 @@ func execUsageLogInsertNoResult(ctx context.Context, sqlq sqlExecutor, prepared 
 			account_stats_cost,
 			upstream_request_id,
 			session_id,
+			cache_diagnostic,
 			native_compaction_v2,
 			created_at
 		) VALUES (
@@ -1242,11 +1249,22 @@ func execUsageLogInsertNoResult(ctx context.Context, sqlq sqlExecutor, prepared 
 			$12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24, $25,
-			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62
+			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63
 		)
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
 	`, prepared.args...)
 	return err
+}
+
+func nullOpenCodeCacheDiagnosticJSON(diagnostic *service.OpenCodeCacheDiagnostic) sql.NullString {
+	if diagnostic == nil {
+		return sql.NullString{}
+	}
+	encoded, err := json.Marshal(diagnostic)
+	if err != nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(encoded), Valid: true}
 }
 
 func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
@@ -1286,6 +1304,7 @@ func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
 	billingMode := nullString(log.BillingMode)
 	upstreamRequestID := nullString(log.UpstreamRequestID)
 	sessionID := nullString(log.SessionID)
+	cacheDiagnostic := nullOpenCodeCacheDiagnosticJSON(log.CacheDiagnostic)
 	requestedModel := strings.TrimSpace(log.RequestedModel)
 	if requestedModel == "" {
 		requestedModel = strings.TrimSpace(log.Model)
@@ -1365,6 +1384,7 @@ func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
 			log.AccountStatsCost, // account_stats_cost
 			upstreamRequestID,    // upstream_request_id
 			sessionID,            // session_id
+			cacheDiagnostic,      // cache_diagnostic
 			log.NativeCompactionV2,
 			createdAt,
 		},

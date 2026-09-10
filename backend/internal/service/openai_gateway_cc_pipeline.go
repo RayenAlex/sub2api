@@ -225,6 +225,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	account.ApplyHeaderOverrides(upstreamReq.Header)
 	applyOpenCodeSessionHeader(c, account, targetURL, upstreamReq.Header)
 	applyOpenCodeSessionAffinityHeader(c, account, upstreamReq.Header)
+	setOpenCodeCacheDiagnostic(c, buildOpenCodeCacheDiagnostic(s.cfg, account, explicitOpenAIHeaderSessionID(c), upstreamReq.Header, body))
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
