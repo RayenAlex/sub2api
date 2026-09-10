@@ -355,6 +355,31 @@ describe('EditAccountModal', () => {
     })
   })
 
+  it('shows and persists the response provider affinity switch only for OpenAI API-key accounts', async () => {
+    const account = buildAccount()
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    const toggle = wrapper.get('[data-testid="response-provider-affinity-toggle"]')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+
+    await toggle.trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.forward_opencode_session_affinity).toBe(true)
+
+    const persisted = buildAccount()
+    persisted.credentials.forward_opencode_session_affinity = true
+    const persistedWrapper = mountModal(persisted)
+    expect(persistedWrapper.get('[data-testid="response-provider-affinity-toggle"]').attributes('aria-checked')).toBe('true')
+
+    const oauthWrapper = mountModal(buildOpenAIOAuthParentAccount())
+    expect(oauthWrapper.find('[data-testid="response-provider-affinity-toggle"]').exists()).toBe(false)
+  })
+
   it('preserves adaptive Kimi Responses endpoint on submit', async () => {
     const account = buildAccount()
     account.platform = 'kimi'

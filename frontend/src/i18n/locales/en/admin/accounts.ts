@@ -828,6 +828,10 @@ export default {
         invalidValue: 'Invalid header value (control characters are not allowed; max length 8192)',
         tooManyEntries: 'Too many header override entries (max 64)'
       },
+      responseProviderAffinity: {
+        title: 'Responses Provider Affinity',
+        hint: 'OpenAI API-key accounts only. For an explicitly trusted CPA upstream, forwards the OpenCode session as X-Session-Affinity so one Responses conversation stays on the same upstream provider and can reuse prompt cache.'
+      },
       grokCustomBaseUrl: {
         title: 'Custom Upstream URL',
         hint: 'When enabled, account traffic (chat/media/probes) is forwarded to the specified address. OAuth authorization and token refresh are unaffected and stay on the official endpoints.',

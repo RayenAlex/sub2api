@@ -898,6 +898,10 @@ export default {
         invalidValue: '请求头值不合法（不允许控制字符，长度不超过 8192）',
         tooManyEntries: '请求头覆写条目过多（最多 64 条）'
       },
+      responseProviderAffinity: {
+        title: 'Responses 提供商粘连',
+        hint: '仅对 OpenAI API Key 账号生效。开启后将 OpenCode 会话标识作为 X-Session-Affinity 转给已受信任的 CPA 上游，使同一 Responses 会话固定使用同一个上游提供商，提升提示词缓存复用。'
+      },
       grokCustomBaseUrl: {
         title: '自定义上游地址',
         hint: '开启后账号流量（对话/媒体/探测）改发指定地址；OAuth 授权与令牌刷新不受影响，仍走官方端点。',

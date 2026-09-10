@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_VERSION: 0.2.1-opencode-session-affinity-20260910
+  IMAGE_VERSION: 0.2.1-response-provider-affinity-20260910
 
 jobs:
   regression-test:

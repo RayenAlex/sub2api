@@ -624,6 +624,39 @@
         </div>
       </div>
 
+      <!-- CPA/OpenCode Responses provider affinity (trusted OpenAI API-key upstreams only) -->
+      <div
+        v-if="responseProviderAffinityCapable"
+        class="border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.responseProviderAffinity.title') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.responseProviderAffinity.hint') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            data-testid="response-provider-affinity-toggle"
+            :aria-checked="responseProviderAffinityEnabled"
+            :aria-label="t('admin.accounts.responseProviderAffinity.title')"
+            @click="responseProviderAffinityEnabled = !responseProviderAffinityEnabled"
+            :class="[
+              'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              responseProviderAffinityEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+            ]"
+          >
+            <span
+              :class="[
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                responseProviderAffinityEnabled ? 'translate-x-5' : 'translate-x-0'
+              ]"
+            />
+          </button>
+        </div>
+      </div>
+
       <!-- OpenAI/Grok OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) -->
       <div
         v-if="(account.platform === 'openai' || account.platform === 'grok') && account.type === 'oauth'"
@@ -3221,6 +3254,11 @@ const selectedErrorCodes = ref<number[]>([])
 const customErrorCodeInput = ref<number | null>(null)
 const headerOverrideEnabled = ref(false)
 const headerOverrideRows = ref<HeaderOverrideRow[]>([])
+const FORWARD_OPENCODE_SESSION_AFFINITY_CREDENTIAL_KEY = 'forward_opencode_session_affinity'
+const responseProviderAffinityEnabled = ref(false)
+const responseProviderAffinityCapable = computed(
+  () => props.account?.platform === 'openai' && props.account?.type === 'apikey'
+)
 
 const headerOverrideCapable = computed(
   () => !!props.account && isHeaderOverrideCapable(props.account.platform, props.account.type)
@@ -3961,6 +3999,11 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       overrideCreds[HEADER_OVERRIDES_CREDENTIAL_KEY]
     )
   }
+
+  responseProviderAffinityEnabled.value =
+    newAccount.platform === 'openai' &&
+    newAccount.type === 'apikey' &&
+    credentials?.[FORWARD_OPENCODE_SESSION_AFFINITY_CREDENTIAL_KEY] === true
 
   // Load Grok OAuth custom upstream URL state（存储的官方地址视同未定制）
   grokOAuthCustomBaseUrlEnabled.value = false
@@ -4986,6 +5029,18 @@ const handleSubmit = async () => {
         return
       }
 
+      updatePayload.credentials = newCredentials
+    }
+
+    if (responseProviderAffinityCapable.value) {
+      const currentCredentials = (updatePayload.credentials as Record<string, unknown>) ||
+        ((props.account.credentials as Record<string, unknown>) || {})
+      const newCredentials: Record<string, unknown> = { ...currentCredentials }
+      if (responseProviderAffinityEnabled.value) {
+        newCredentials[FORWARD_OPENCODE_SESSION_AFFINITY_CREDENTIAL_KEY] = true
+      } else {
+        delete newCredentials[FORWARD_OPENCODE_SESSION_AFFINITY_CREDENTIAL_KEY]
+      }
       updatePayload.credentials = newCredentials
     }
 
