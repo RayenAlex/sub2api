@@ -1168,7 +1168,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					}
 				}
 				replayCollector.AddEvent(eventType, upstreamMessage)
-				// 客户端写出副本改写容量降载码：Codex 对 error/response.failed 中的
+				// 客户端写出副本改写容量降载码与上下文超限码：Codex 对 error/response.failed 中的
 				// server_is_overloaded / slow_down 判致命并终止会话，改写后走客户端
 				// 内置退避重试。HTTP/SSE（openai_gateway_response_handling.go）与
 				// http_bridge（openai_ws_http_bridge.go）两条路径早已这么做，
@@ -1178,10 +1178,10 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				// 必须写进独立变量而不是原地改 upstreamMessage：下面的
 				// markOpenAIWSClientVisibleFailure 与 handleOpenAIWSTerminalTransientFailure
 				// 仍要按未改写的原始 payload 判定账号状态，这正是
-				// sanitizeOpenAICapacityShedErrorCodeForClient 注释里写明的前提。
+				// 两类错误改写函数注释里写明的前提。
 				clientMessage := upstreamMessage
 				if eventType == "error" || eventType == "response.failed" {
-					if rewritten, changed := sanitizeOpenAICapacityShedErrorCodeForClient(clientMessage); changed {
+					if rewritten, changed := sanitizeOpenAIResponseFailedEventForClient(clientMessage, eventType, true); changed {
 						clientMessage = rewritten
 					}
 				}

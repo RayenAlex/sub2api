@@ -205,6 +205,13 @@ func isOpenAIContextWindowError(upstreamMsg string, upstreamBody []byte) bool {
 		if strings.Contains(lower, "maximum context length") || strings.Contains(lower, "max context length") {
 			return true
 		}
+		// Devin reports context exhaustion without mentioning "context" or
+		// returning context_length_exceeded. Keep the model qualifier so an
+		// unrelated user prompt containing "prompt is too long" cannot change
+		// request classification.
+		if strings.Contains(lower, "prompt is too long for this model") {
+			return true
+		}
 		hasExceeded := strings.Contains(lower, "exceed") || strings.Contains(lower, "too large") || strings.Contains(lower, "too long")
 		if strings.Contains(lower, "context window") && hasExceeded {
 			return true

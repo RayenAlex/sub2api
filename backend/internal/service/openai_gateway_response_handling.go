@@ -1860,10 +1860,7 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 	if rewritten, changed := sanitizeOpenAICapacityShedErrorCodeForClient(updated); changed {
 		updated = rewritten
 	}
-	if !isFailedEvent {
-		return updated, !bytes.Equal(updated, payload)
-	}
-	if clientOutputStarted && isOpenAIContextWindowError(extractOpenAISSEErrorMessage(payload), payload) {
+	if (clientOutputStarted || eventType == "error") && isOpenAIContextWindowError(extractOpenAISSEErrorMessage(payload), payload) {
 		errorPath := ""
 		switch {
 		case gjson.GetBytes(updated, "response.error").Exists():
@@ -1883,6 +1880,9 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 			}
 			updated = next
 		}
+	}
+	if !isFailedEvent {
+		return updated, !bytes.Equal(updated, payload)
 	}
 	if !gjson.GetBytes(updated, "response").Exists() {
 		return updated, !bytes.Equal(updated, payload)
