@@ -109,7 +109,7 @@ func (r *subscriptionExpiryRepoStub) ResetMonthlyUsage(context.Context, int64, *
 	return nil
 }
 
-func (r *subscriptionExpiryRepoStub) IncrementUsage(context.Context, int64, float64) error {
+func (r *subscriptionExpiryRepoStub) IncrementUsage(context.Context, int64, float64, int64) error {
 	return nil
 }
 

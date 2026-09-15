@@ -340,6 +340,12 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if subscriptionType == "" {
 		subscriptionType = SubscriptionTypeStandard
 	}
+	if input.TokenQuota != nil && subscriptionType != SubscriptionTypeSubscription {
+		return nil, ErrTokenQuotaRequiresSubscriptionGroup
+	}
+	if err := validateTokenQuota(input.TokenQuota); err != nil {
+		return nil, err
+	}
 
 	// 限额字段：nil/负数 表示"无限制"，0 表示"不允许用量"，正数表示具体限额
 	dailyLimit := normalizeLimit(input.DailyLimitUSD)
@@ -485,6 +491,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyLimitUSD:                   dailyLimit,
 		WeeklyLimitUSD:                  weeklyLimit,
 		MonthlyLimitUSD:                 monthlyLimit,
+		DailyTokenLimit:                 tokenLimitFromInput(input.TokenQuota, "daily"),
+		WeeklyTokenLimit:                tokenLimitFromInput(input.TokenQuota, "weekly"),
+		MonthlyTokenLimit:               tokenLimitFromInput(input.TokenQuota, "monthly"),
 		LongContextPricingEnabled:       input.LongContextPricingEnabled,
 		ModelPricing:                    modelPricing,
 		AllowImageGeneration:            allowImageGeneration,
@@ -580,6 +589,53 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 }
 
 // normalizeLimit 将负数转换为 nil（表示无限制），0 保留（表示限额为零）
+var ErrTokenQuotaRequiresSubscriptionGroup = infraerrors.BadRequest("TOKEN_QUOTA_REQUIRES_SUBSCRIPTION_GROUP", "token quota can only be configured on subscription groups")
+
+// tokenLimitFromInput 将 TokenQuotaInput 的某个窗口转为 *int64（nil=不限，0=禁止）
+func tokenLimitFromInput(q *TokenQuotaInput, window string) *int64 {
+	if q == nil {
+		return nil
+	}
+	var w TokenQuotaWindowInput
+	switch window {
+	case "daily":
+		w = q.Daily
+	case "weekly":
+		w = q.Weekly
+	case "monthly":
+		w = q.Monthly
+	}
+	if !w.Enabled {
+		return nil
+	}
+	if w.Limit == nil {
+		return nil
+	}
+	return w.Limit
+}
+
+var ErrTokenQuotaNegativeLimit = infraerrors.BadRequest("TOKEN_QUOTA_NEGATIVE_LIMIT", "token quota limit must be >= 0")
+
+// validateTokenQuota 校验 token 配额：启用时 limit 必须为非负数（nil 视为不限）
+func validateTokenQuota(q *TokenQuotaInput) error {
+	if q == nil {
+		return nil
+	}
+	for _, w := range []TokenQuotaWindowInput{q.Daily, q.Weekly, q.Monthly} {
+		if w.Enabled && w.Limit != nil && *w.Limit < 0 {
+			return ErrTokenQuotaNegativeLimit
+		}
+	}
+	return nil
+}
+
+// applyTokenQuota 将 TokenQuotaInput 应用到 Group（更新语义：完整 desired-state）
+func applyTokenQuota(g *Group, q *TokenQuotaInput) {
+	g.DailyTokenLimit = tokenLimitFromInput(q, "daily")
+	g.WeeklyTokenLimit = tokenLimitFromInput(q, "weekly")
+	g.MonthlyTokenLimit = tokenLimitFromInput(q, "monthly")
+}
+
 func normalizeLimit(limit *float64) *float64 {
 	if limit == nil || *limit < 0 {
 		return nil
@@ -718,6 +774,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.MonthlyLimitUSD != nil {
 		group.MonthlyLimitUSD = normalizeLimit(input.MonthlyLimitUSD)
+	}
+	// Token 配额：仅 subscription 类型允许；完整 desired-state 更新
+	if input.TokenQuota != nil {
+		if group.SubscriptionType != SubscriptionTypeSubscription {
+			return nil, ErrTokenQuotaRequiresSubscriptionGroup
+		}
+		if err := validateTokenQuota(input.TokenQuota); err != nil {
+			return nil, err
+		}
+		applyTokenQuota(group, input.TokenQuota)
 	}
 	// 图片生成计费配置：负数表示清除（使用默认价格）
 	if input.AllowImageGeneration != nil {

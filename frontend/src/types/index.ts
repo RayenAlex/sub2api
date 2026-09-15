@@ -553,6 +553,17 @@ export interface ReasoningEffortMapping {
   model?: string
 }
 
+export interface TokenQuotaWindow {
+  enabled: boolean
+  limit: number | null
+}
+
+export interface TokenQuota {
+  daily: TokenQuotaWindow
+  weekly: TokenQuotaWindow
+  monthly: TokenQuotaWindow
+}
+
 export interface Group {
   id: number
   name: string
@@ -567,6 +578,7 @@ export interface Group {
   status: 'active' | 'inactive'
   subscription_type: SubscriptionType
   daily_limit_usd: number | null
+  token_quota?: TokenQuota | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null
   long_context_pricing_enabled: boolean
@@ -2040,6 +2052,9 @@ export interface UserSubscription {
   daily_usage_usd: number
   weekly_usage_usd: number
   monthly_usage_usd: number
+  daily_token_usage: number
+  weekly_token_usage: number
+  monthly_token_usage: number
   daily_window_start: string | null
   weekly_window_start: string | null
   monthly_window_start: string | null

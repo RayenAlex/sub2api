@@ -991,7 +991,9 @@ export default {
         monthlyLimit: 'Monthly Limit (USD)',
         defaultValidityDays: 'Default Validity (Days)',
         validityHint: 'Number of days the subscription is valid when assigned to a user',
-        noLimit: 'No limit'
+        noLimit: 'No limit',
+        tokenQuotaTitle: 'Token Quota (tokens)',
+        tokenQuotaHint: 'Enabled + empty = deny (0), enter value = daily/weekly/monthly cap'
       },
       imagePricing: {
         title: 'Image Generation Pricing',

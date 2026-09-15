@@ -189,6 +189,48 @@ func (_c *UserSubscriptionCreate) SetNillableMonthlyUsageUsd(v *float64) *UserSu
 	return _c
 }
 
+// SetDailyTokenUsage sets the "daily_token_usage" field.
+func (_c *UserSubscriptionCreate) SetDailyTokenUsage(v int64) *UserSubscriptionCreate {
+	_c.mutation.SetDailyTokenUsage(v)
+	return _c
+}
+
+// SetNillableDailyTokenUsage sets the "daily_token_usage" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableDailyTokenUsage(v *int64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetDailyTokenUsage(*v)
+	}
+	return _c
+}
+
+// SetWeeklyTokenUsage sets the "weekly_token_usage" field.
+func (_c *UserSubscriptionCreate) SetWeeklyTokenUsage(v int64) *UserSubscriptionCreate {
+	_c.mutation.SetWeeklyTokenUsage(v)
+	return _c
+}
+
+// SetNillableWeeklyTokenUsage sets the "weekly_token_usage" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableWeeklyTokenUsage(v *int64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetWeeklyTokenUsage(*v)
+	}
+	return _c
+}
+
+// SetMonthlyTokenUsage sets the "monthly_token_usage" field.
+func (_c *UserSubscriptionCreate) SetMonthlyTokenUsage(v int64) *UserSubscriptionCreate {
+	_c.mutation.SetMonthlyTokenUsage(v)
+	return _c
+}
+
+// SetNillableMonthlyTokenUsage sets the "monthly_token_usage" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableMonthlyTokenUsage(v *int64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetMonthlyTokenUsage(*v)
+	}
+	return _c
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (_c *UserSubscriptionCreate) SetAssignedBy(v int64) *UserSubscriptionCreate {
 	_c.mutation.SetAssignedBy(v)
@@ -342,6 +384,18 @@ func (_c *UserSubscriptionCreate) defaults() error {
 		v := usersubscription.DefaultMonthlyUsageUsd
 		_c.mutation.SetMonthlyUsageUsd(v)
 	}
+	if _, ok := _c.mutation.DailyTokenUsage(); !ok {
+		v := usersubscription.DefaultDailyTokenUsage
+		_c.mutation.SetDailyTokenUsage(v)
+	}
+	if _, ok := _c.mutation.WeeklyTokenUsage(); !ok {
+		v := usersubscription.DefaultWeeklyTokenUsage
+		_c.mutation.SetWeeklyTokenUsage(v)
+	}
+	if _, ok := _c.mutation.MonthlyTokenUsage(); !ok {
+		v := usersubscription.DefaultMonthlyTokenUsage
+		_c.mutation.SetMonthlyTokenUsage(v)
+	}
 	if _, ok := _c.mutation.AssignedAt(); !ok {
 		if usersubscription.DefaultAssignedAt == nil {
 			return fmt.Errorf("ent: uninitialized usersubscription.DefaultAssignedAt (forgotten import ent/runtime?)")
@@ -388,6 +442,15 @@ func (_c *UserSubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.MonthlyUsageUsd(); !ok {
 		return &ValidationError{Name: "monthly_usage_usd", err: errors.New(`ent: missing required field "UserSubscription.monthly_usage_usd"`)}
+	}
+	if _, ok := _c.mutation.DailyTokenUsage(); !ok {
+		return &ValidationError{Name: "daily_token_usage", err: errors.New(`ent: missing required field "UserSubscription.daily_token_usage"`)}
+	}
+	if _, ok := _c.mutation.WeeklyTokenUsage(); !ok {
+		return &ValidationError{Name: "weekly_token_usage", err: errors.New(`ent: missing required field "UserSubscription.weekly_token_usage"`)}
+	}
+	if _, ok := _c.mutation.MonthlyTokenUsage(); !ok {
+		return &ValidationError{Name: "monthly_token_usage", err: errors.New(`ent: missing required field "UserSubscription.monthly_token_usage"`)}
 	}
 	if _, ok := _c.mutation.AssignedAt(); !ok {
 		return &ValidationError{Name: "assigned_at", err: errors.New(`ent: missing required field "UserSubscription.assigned_at"`)}
@@ -472,6 +535,18 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 	if value, ok := _c.mutation.MonthlyUsageUsd(); ok {
 		_spec.SetField(usersubscription.FieldMonthlyUsageUsd, field.TypeFloat64, value)
 		_node.MonthlyUsageUsd = value
+	}
+	if value, ok := _c.mutation.DailyTokenUsage(); ok {
+		_spec.SetField(usersubscription.FieldDailyTokenUsage, field.TypeInt64, value)
+		_node.DailyTokenUsage = value
+	}
+	if value, ok := _c.mutation.WeeklyTokenUsage(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyTokenUsage, field.TypeInt64, value)
+		_node.WeeklyTokenUsage = value
+	}
+	if value, ok := _c.mutation.MonthlyTokenUsage(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyTokenUsage, field.TypeInt64, value)
+		_node.MonthlyTokenUsage = value
 	}
 	if value, ok := _c.mutation.AssignedAt(); ok {
 		_spec.SetField(usersubscription.FieldAssignedAt, field.TypeTime, value)
@@ -798,6 +873,60 @@ func (u *UserSubscriptionUpsert) AddMonthlyUsageUsd(v float64) *UserSubscription
 	return u
 }
 
+// SetDailyTokenUsage sets the "daily_token_usage" field.
+func (u *UserSubscriptionUpsert) SetDailyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldDailyTokenUsage, v)
+	return u
+}
+
+// UpdateDailyTokenUsage sets the "daily_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateDailyTokenUsage() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldDailyTokenUsage)
+	return u
+}
+
+// AddDailyTokenUsage adds v to the "daily_token_usage" field.
+func (u *UserSubscriptionUpsert) AddDailyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldDailyTokenUsage, v)
+	return u
+}
+
+// SetWeeklyTokenUsage sets the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsert) SetWeeklyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldWeeklyTokenUsage, v)
+	return u
+}
+
+// UpdateWeeklyTokenUsage sets the "weekly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateWeeklyTokenUsage() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldWeeklyTokenUsage)
+	return u
+}
+
+// AddWeeklyTokenUsage adds v to the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsert) AddWeeklyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldWeeklyTokenUsage, v)
+	return u
+}
+
+// SetMonthlyTokenUsage sets the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsert) SetMonthlyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldMonthlyTokenUsage, v)
+	return u
+}
+
+// UpdateMonthlyTokenUsage sets the "monthly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateMonthlyTokenUsage() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldMonthlyTokenUsage)
+	return u
+}
+
+// AddMonthlyTokenUsage adds v to the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsert) AddMonthlyTokenUsage(v int64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldMonthlyTokenUsage, v)
+	return u
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (u *UserSubscriptionUpsert) SetAssignedBy(v int64) *UserSubscriptionUpsert {
 	u.Set(usersubscription.FieldAssignedBy, v)
@@ -1119,6 +1248,69 @@ func (u *UserSubscriptionUpsertOne) AddMonthlyUsageUsd(v float64) *UserSubscript
 func (u *UserSubscriptionUpsertOne) UpdateMonthlyUsageUsd() *UserSubscriptionUpsertOne {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetDailyTokenUsage sets the "daily_token_usage" field.
+func (u *UserSubscriptionUpsertOne) SetDailyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetDailyTokenUsage(v)
+	})
+}
+
+// AddDailyTokenUsage adds v to the "daily_token_usage" field.
+func (u *UserSubscriptionUpsertOne) AddDailyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddDailyTokenUsage(v)
+	})
+}
+
+// UpdateDailyTokenUsage sets the "daily_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateDailyTokenUsage() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateDailyTokenUsage()
+	})
+}
+
+// SetWeeklyTokenUsage sets the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsertOne) SetWeeklyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetWeeklyTokenUsage(v)
+	})
+}
+
+// AddWeeklyTokenUsage adds v to the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsertOne) AddWeeklyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddWeeklyTokenUsage(v)
+	})
+}
+
+// UpdateWeeklyTokenUsage sets the "weekly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateWeeklyTokenUsage() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateWeeklyTokenUsage()
+	})
+}
+
+// SetMonthlyTokenUsage sets the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsertOne) SetMonthlyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetMonthlyTokenUsage(v)
+	})
+}
+
+// AddMonthlyTokenUsage adds v to the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsertOne) AddMonthlyTokenUsage(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddMonthlyTokenUsage(v)
+	})
+}
+
+// UpdateMonthlyTokenUsage sets the "monthly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateMonthlyTokenUsage() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateMonthlyTokenUsage()
 	})
 }
 
@@ -1617,6 +1809,69 @@ func (u *UserSubscriptionUpsertBulk) AddMonthlyUsageUsd(v float64) *UserSubscrip
 func (u *UserSubscriptionUpsertBulk) UpdateMonthlyUsageUsd() *UserSubscriptionUpsertBulk {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetDailyTokenUsage sets the "daily_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) SetDailyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetDailyTokenUsage(v)
+	})
+}
+
+// AddDailyTokenUsage adds v to the "daily_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) AddDailyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddDailyTokenUsage(v)
+	})
+}
+
+// UpdateDailyTokenUsage sets the "daily_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateDailyTokenUsage() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateDailyTokenUsage()
+	})
+}
+
+// SetWeeklyTokenUsage sets the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) SetWeeklyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetWeeklyTokenUsage(v)
+	})
+}
+
+// AddWeeklyTokenUsage adds v to the "weekly_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) AddWeeklyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddWeeklyTokenUsage(v)
+	})
+}
+
+// UpdateWeeklyTokenUsage sets the "weekly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateWeeklyTokenUsage() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateWeeklyTokenUsage()
+	})
+}
+
+// SetMonthlyTokenUsage sets the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) SetMonthlyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetMonthlyTokenUsage(v)
+	})
+}
+
+// AddMonthlyTokenUsage adds v to the "monthly_token_usage" field.
+func (u *UserSubscriptionUpsertBulk) AddMonthlyTokenUsage(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddMonthlyTokenUsage(v)
+	})
+}
+
+// UpdateMonthlyTokenUsage sets the "monthly_token_usage" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateMonthlyTokenUsage() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateMonthlyTokenUsage()
 	})
 }
 

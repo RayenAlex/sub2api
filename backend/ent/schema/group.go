@@ -94,6 +94,16 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		// Token 配额（token 数量；nil=不限，0=禁止消耗）
+		field.Int64("daily_token_limit").
+			Optional().
+			Nillable(),
+		field.Int64("weekly_token_limit").
+			Optional().
+			Nillable(),
+		field.Int64("monthly_token_limit").
+			Optional().
+			Nillable(),
 		field.Int("default_validity_days").
 			Default(30),
 

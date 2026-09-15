@@ -221,6 +221,7 @@ type CreateGroupInput struct {
 	DailyLimitUSD             *float64 // 日限额 (USD)
 	WeeklyLimitUSD            *float64 // 周限额 (USD)
 	MonthlyLimitUSD           *float64 // 月限额 (USD)
+	TokenQuota                *TokenQuotaInput
 	LongContextPricingEnabled bool
 	ModelPricing              []ChannelModelPricing
 	// 图片生成计费配置（仅 antigravity 平台使用）
@@ -291,6 +292,17 @@ type CreateGroupInput struct {
 	CopyAccountsFromGroupIDs []int64
 }
 
+type TokenQuotaWindowInput struct {
+	Enabled bool   `json:"enabled"`
+	Limit   *int64 `json:"limit"`
+}
+
+type TokenQuotaInput struct {
+	Daily   TokenQuotaWindowInput `json:"daily"`
+	Weekly  TokenQuotaWindowInput `json:"weekly"`
+	Monthly TokenQuotaWindowInput `json:"monthly"`
+}
+
 type UpdateGroupInput struct {
 	Name                      string
 	Description               *string
@@ -302,6 +314,7 @@ type UpdateGroupInput struct {
 	DailyLimitUSD             *float64 // 日限额 (USD)
 	WeeklyLimitUSD            *float64 // 周限额 (USD)
 	MonthlyLimitUSD           *float64 // 月限额 (USD)
+	TokenQuota                *TokenQuotaInput
 	LongContextPricingEnabled *bool
 	ModelPricing              *[]ChannelModelPricing
 	// 图片生成计费配置（仅 antigravity 平台使用）

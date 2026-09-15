@@ -190,6 +190,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		DailyLimitUSD:                   g.DailyLimitUSD,
 		WeeklyLimitUSD:                  g.WeeklyLimitUSD,
 		MonthlyLimitUSD:                 g.MonthlyLimitUSD,
+		TokenQuota:                      tokenQuotaOutputFromGroup(g),
 		LongContextPricingEnabled:       g.LongContextPricingEnabled,
 		AllowImageGeneration:            g.AllowImageGeneration,
 		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
@@ -894,6 +895,9 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		DailyUsageUSD:      sub.DailyUsageUSD,
 		WeeklyUsageUSD:     sub.WeeklyUsageUSD,
 		MonthlyUsageUSD:    sub.MonthlyUsageUSD,
+		DailyTokenUsage:    sub.DailyTokenUsage,
+		WeeklyTokenUsage:   sub.WeeklyTokenUsage,
+		MonthlyTokenUsage:  sub.MonthlyTokenUsage,
 		CreatedAt:          sub.CreatedAt,
 		UpdatedAt:          sub.UpdatedAt,
 		RevokedAt:          sub.DeletedAt,
@@ -955,4 +959,27 @@ func PromoCodeUsageFromService(u *service.PromoCodeUsage) *PromoCodeUsage {
 		UsedAt:      u.UsedAt,
 		User:        UserFromServiceShallow(u.User),
 	}
+}
+
+// tokenQuotaOutputFromGroup 将 Group 的 token limit 字段转为 API 输出结构
+func tokenQuotaOutputFromGroup(g *service.Group) *TokenQuotaOutput {
+	if g == nil {
+		return nil
+	}
+	if g.DailyTokenLimit == nil && g.WeeklyTokenLimit == nil && g.MonthlyTokenLimit == nil {
+		return nil
+	}
+	out := &TokenQuotaOutput{
+		Daily:   tokenQuotaWindowFromLimit(g.DailyTokenLimit),
+		Weekly:  tokenQuotaWindowFromLimit(g.WeeklyTokenLimit),
+		Monthly: tokenQuotaWindowFromLimit(g.MonthlyTokenLimit),
+	}
+	return out
+}
+
+func tokenQuotaWindowFromLimit(limit *int64) TokenQuotaWindowOutput {
+	if limit == nil {
+		return TokenQuotaWindowOutput{Enabled: false, Limit: nil}
+	}
+	return TokenQuotaWindowOutput{Enabled: true, Limit: limit}
 }

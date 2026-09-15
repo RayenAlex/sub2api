@@ -39,6 +39,10 @@ type Group struct {
 	DailyLimitUSD       *float64
 	WeeklyLimitUSD      *float64
 	MonthlyLimitUSD     *float64
+	// Token 配额（token 数量；nil=不限，0=禁止消耗 token 的硬上限）
+	DailyTokenLimit   *int64
+	WeeklyTokenLimit  *int64
+	MonthlyTokenLimit *int64
 	DefaultValidityDays int
 
 	// 图片生成计费配置（antigravity 和 gemini 平台使用）
@@ -160,6 +164,19 @@ func (g *Group) HasWeeklyLimit() bool {
 
 func (g *Group) HasMonthlyLimit() bool {
 	return g.MonthlyLimitUSD != nil && *g.MonthlyLimitUSD > 0
+}
+
+// Token 配额判定：nil 为不限，0 表示已启用的硬上限（禁止消耗 token）
+func (g *Group) HasDailyTokenLimit() bool {
+	return g.DailyTokenLimit != nil
+}
+
+func (g *Group) HasWeeklyTokenLimit() bool {
+	return g.WeeklyTokenLimit != nil
+}
+
+func (g *Group) HasMonthlyTokenLimit() bool {
+	return g.MonthlyTokenLimit != nil
 }
 
 // GetImagePrice 根据 image_size 返回对应的图片生成价格

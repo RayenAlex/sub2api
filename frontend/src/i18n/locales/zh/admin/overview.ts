@@ -988,7 +988,9 @@ export default {
         monthlyLimit: '每月限额（USD）',
         defaultValidityDays: '默认有效期（天）',
         validityHint: '分配给用户时订阅的有效天数',
-        noLimit: '无限制'
+        noLimit: '无限制',
+        tokenQuotaTitle: 'Token 配额（tokens）',
+        tokenQuotaHint: '启用后留空 = 禁止（0），填数值 = 每日/周/月上限'
       },
       imagePricing: {
         title: '图片生成计费',

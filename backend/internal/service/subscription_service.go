@@ -38,8 +38,12 @@ var (
 	ErrDailyLimitExceeded          = infraerrors.TooManyRequests("DAILY_LIMIT_EXCEEDED", "daily usage limit exceeded")
 	ErrWeeklyLimitExceeded         = infraerrors.TooManyRequests("WEEKLY_LIMIT_EXCEEDED", "weekly usage limit exceeded")
 	ErrMonthlyLimitExceeded        = infraerrors.TooManyRequests("MONTHLY_LIMIT_EXCEEDED", "monthly usage limit exceeded")
-	ErrSubscriptionNilInput        = infraerrors.BadRequest("SUBSCRIPTION_NIL_INPUT", "subscription input cannot be nil")
-	ErrAdjustWouldExpire           = infraerrors.BadRequest("ADJUST_WOULD_EXPIRE", "adjustment would result in expired subscription (remaining days must be > 0)")
+	// Token 配额超限
+	ErrDailyTokenLimitExceeded   = infraerrors.TooManyRequests("DAILY_TOKEN_LIMIT_EXCEEDED", "daily token quota exceeded")
+	ErrWeeklyTokenLimitExceeded  = infraerrors.TooManyRequests("WEEKLY_TOKEN_LIMIT_EXCEEDED", "weekly token quota exceeded")
+	ErrMonthlyTokenLimitExceeded = infraerrors.TooManyRequests("MONTHLY_TOKEN_LIMIT_EXCEEDED", "monthly token quota exceeded")
+	ErrSubscriptionNilInput      = infraerrors.BadRequest("SUBSCRIPTION_NIL_INPUT", "subscription input cannot be nil")
+	ErrAdjustWouldExpire         = infraerrors.BadRequest("ADJUST_WOULD_EXPIRE", "adjustment would result in expired subscription (remaining days must be > 0)")
 )
 
 // SubscriptionService 订阅服务
@@ -1073,8 +1077,8 @@ func (s *SubscriptionService) doWindowMaintenance(sub *UserSubscription) {
 }
 
 // RecordUsage 记录使用量到订阅
-func (s *SubscriptionService) RecordUsage(ctx context.Context, subscriptionID int64, costUSD float64) error {
-	return s.userSubRepo.IncrementUsage(ctx, subscriptionID, costUSD)
+func (s *SubscriptionService) RecordUsage(ctx context.Context, subscriptionID int64, costUSD float64, tokens int64) error {
+	return s.userSubRepo.IncrementUsage(ctx, subscriptionID, costUSD, tokens)
 }
 
 // SubscriptionProgress 订阅进度
@@ -1097,6 +1101,12 @@ type UsageWindowProgress struct {
 	WindowStart     time.Time `json:"window_start"`
 	ResetsAt        time.Time `json:"resets_at"`
 	ResetsInSeconds int64     `json:"resets_in_seconds"`
+
+	// Token 配额字段（仅订阅分组启用 token 配额时返回）
+	TokenLimit      *int64  `json:"token_limit,omitempty"`
+	TokenUsed       int64   `json:"token_used,omitempty"`
+	TokenRemaining  int64   `json:"token_remaining,omitempty"`
+	TokenPercentage float64 `json:"token_percentage,omitempty"`
 }
 
 // GetSubscriptionProgress 获取订阅使用进度
@@ -1151,6 +1161,25 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 		if progress.Daily.ResetsInSeconds < 0 {
 			progress.Daily.ResetsInSeconds = 0
 		}
+		if group.DailyTokenLimit != nil {
+			tokLimit := *group.DailyTokenLimit
+			progress.Daily.TokenLimit = &tokLimit
+			progress.Daily.TokenUsed = sub.DailyTokenUsage
+			remaining := tokLimit - sub.DailyTokenUsage
+			if remaining < 0 {
+				remaining = 0
+			}
+			progress.Daily.TokenRemaining = remaining
+			if tokLimit > 0 {
+				pct := float64(sub.DailyTokenUsage) / float64(tokLimit) * 100
+				if pct > 100 {
+					pct = 100
+				}
+				progress.Daily.TokenPercentage = pct
+			} else {
+				progress.Daily.TokenPercentage = 100
+			}
+		}
 	}
 
 	// 周进度
@@ -1178,6 +1207,25 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 		if progress.Weekly.ResetsInSeconds < 0 {
 			progress.Weekly.ResetsInSeconds = 0
 		}
+		if group.WeeklyTokenLimit != nil {
+			tokLimit := *group.WeeklyTokenLimit
+			progress.Weekly.TokenLimit = &tokLimit
+			progress.Weekly.TokenUsed = sub.WeeklyTokenUsage
+			remaining := tokLimit - sub.WeeklyTokenUsage
+			if remaining < 0 {
+				remaining = 0
+			}
+			progress.Weekly.TokenRemaining = remaining
+			if tokLimit > 0 {
+				pct := float64(sub.WeeklyTokenUsage) / float64(tokLimit) * 100
+				if pct > 100 {
+					pct = 100
+				}
+				progress.Weekly.TokenPercentage = pct
+			} else {
+				progress.Weekly.TokenPercentage = 100
+			}
+		}
 	}
 
 	// 月进度
@@ -1204,6 +1252,25 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 		}
 		if progress.Monthly.ResetsInSeconds < 0 {
 			progress.Monthly.ResetsInSeconds = 0
+		}
+		if group.MonthlyTokenLimit != nil {
+			tokLimit := *group.MonthlyTokenLimit
+			progress.Monthly.TokenLimit = &tokLimit
+			progress.Monthly.TokenUsed = sub.MonthlyTokenUsage
+			remaining := tokLimit - sub.MonthlyTokenUsage
+			if remaining < 0 {
+				remaining = 0
+			}
+			progress.Monthly.TokenRemaining = remaining
+			if tokLimit > 0 {
+				pct := float64(sub.MonthlyTokenUsage) / float64(tokLimit) * 100
+				if pct > 100 {
+					pct = 100
+				}
+				progress.Monthly.TokenPercentage = pct
+			} else {
+				progress.Monthly.TokenPercentage = 100
+			}
 		}
 	}
 

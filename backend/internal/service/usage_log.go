@@ -242,3 +242,18 @@ func (u *UsageLog) SyncRequestTypeAndLegacyFields() {
 	u.RequestType = requestType
 	u.Stream, u.OpenAIWSMode = ApplyLegacyRequestFields(requestType, u.Stream, u.OpenAIWSMode)
 }
+
+// BillableTokens 返回计入订阅 token 配额的总数：input + output + cache 创建 + cache 读取。
+// 负数字段按 0 处理。
+func (u *UsageLog) BillableTokens() int64 {
+	if u == nil {
+		return 0
+	}
+	pos := func(v int) int64 {
+		if v < 0 {
+			return 0
+		}
+		return int64(v)
+	}
+	return pos(u.InputTokens) + pos(u.OutputTokens) + pos(u.CacheCreationTokens) + pos(u.CacheReadTokens)
+}

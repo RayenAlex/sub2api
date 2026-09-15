@@ -39,6 +39,8 @@ type UsageBillingCommand struct {
 
 	BalanceCost         float64
 	SubscriptionCost    float64
+	// SubscriptionTokens 订阅模式下本次请求实际消耗的 token 数（非订阅为 0）
+	SubscriptionTokens  int64
 	APIKeyQuotaCost     float64
 	APIKeyRateLimitCost float64
 	AccountQuotaCost    float64
@@ -223,4 +225,19 @@ type UsageBillingRepository interface {
 	ReserveBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
 	CaptureBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
 	ReleaseBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
+}
+
+// BillableTokens 返回本次请求实际消耗的 token 总数（input + output + cache 创建/读取）。
+// 负数防御性字段按 0 处理，不允许用量倒退。
+func (c *UsageBillingCommand) BillableTokens() int64 {
+	if c == nil {
+		return 0
+	}
+	pos := func(v int) int64 {
+		if v < 0 {
+			return 0
+		}
+		return int64(v)
+	}
+	return pos(c.InputTokens) + pos(c.OutputTokens) + pos(c.CacheCreationTokens) + pos(c.CacheReadTokens)
 }

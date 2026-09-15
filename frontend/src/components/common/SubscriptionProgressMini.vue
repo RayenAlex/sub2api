@@ -158,6 +158,106 @@
                     }}
                   </span>
                 </div>
+                <!-- Token quota bars -->
+                <div
+                  v-if="subscription.group?.token_quota?.daily?.enabled"
+                  class="flex items-center gap-2"
+                >
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{
+                    t('subscriptionProgress.daily')
+                  }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="
+                        getProgressBarClass(
+                          subscription.daily_token_usage,
+                          subscription.group?.token_quota?.daily?.limit ?? undefined
+                        )
+                      "
+                      :style="{
+                        width: getProgressWidth(
+                          subscription.daily_token_usage,
+                          subscription.group?.token_quota?.daily?.limit ?? undefined
+                        )
+                      }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{
+                      formatTokenUsage(
+                        subscription.daily_token_usage,
+                        subscription.group?.token_quota?.daily?.limit
+                      )
+                    }}
+                  </span>
+                </div>
+                <div
+                  v-if="subscription.group?.token_quota?.weekly?.enabled"
+                  class="flex items-center gap-2"
+                >
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{
+                    t('subscriptionProgress.weekly')
+                  }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="
+                        getProgressBarClass(
+                          subscription.weekly_token_usage,
+                          subscription.group?.token_quota?.weekly?.limit ?? undefined
+                        )
+                      "
+                      :style="{
+                        width: getProgressWidth(
+                          subscription.weekly_token_usage,
+                          subscription.group?.token_quota?.weekly?.limit ?? undefined
+                        )
+                      }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{
+                      formatTokenUsage(
+                        subscription.weekly_token_usage,
+                        subscription.group?.token_quota?.weekly?.limit
+                      )
+                    }}
+                  </span>
+                </div>
+                <div
+                  v-if="subscription.group?.token_quota?.monthly?.enabled"
+                  class="flex items-center gap-2"
+                >
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{
+                    t('subscriptionProgress.monthly')
+                  }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="
+                        getProgressBarClass(
+                          subscription.monthly_token_usage,
+                          subscription.group?.token_quota?.monthly?.limit ?? undefined
+                        )
+                      "
+                      :style="{
+                        width: getProgressWidth(
+                          subscription.monthly_token_usage,
+                          subscription.group?.token_quota?.monthly?.limit ?? undefined
+                        )
+                      }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{
+                      formatTokenUsage(
+                        subscription.monthly_token_usage,
+                        subscription.group?.token_quota?.monthly?.limit
+                      )
+                    }}
+                  </span>
+                </div>
               </template>
             </div>
           </div>
@@ -215,15 +315,29 @@ function getMaxUsagePercentage(sub: UserSubscription): number {
   if (sub.group?.monthly_limit_usd) {
     percentages.push(((sub.monthly_usage_usd || 0) / sub.group.monthly_limit_usd) * 100)
   }
+  const tq = sub.group?.token_quota
+  if (tq?.daily?.enabled && tq.daily.limit) {
+    percentages.push(((sub.daily_token_usage || 0) / tq.daily.limit) * 100)
+  }
+  if (tq?.weekly?.enabled && tq.weekly.limit) {
+    percentages.push(((sub.weekly_token_usage || 0) / tq.weekly.limit) * 100)
+  }
+  if (tq?.monthly?.enabled && tq.monthly.limit) {
+    percentages.push(((sub.monthly_token_usage || 0) / tq.monthly.limit) * 100)
+  }
   return percentages.length > 0 ? Math.max(...percentages) : 0
 }
 
 function isUnlimited(sub: UserSubscription): boolean {
-  return (
-    !sub.group?.daily_limit_usd &&
-    !sub.group?.weekly_limit_usd &&
-    !sub.group?.monthly_limit_usd
-  )
+  const hasUsdLimit =
+    !!sub.group?.daily_limit_usd ||
+    !!sub.group?.weekly_limit_usd ||
+    !!sub.group?.monthly_limit_usd
+  const hasTokenLimit =
+    !!sub.group?.token_quota?.daily?.enabled ||
+    !!sub.group?.token_quota?.weekly?.enabled ||
+    !!sub.group?.token_quota?.monthly?.enabled
+  return !hasUsdLimit && !hasTokenLimit
 }
 
 function getProgressDotClass(sub: UserSubscription): string {
@@ -255,6 +369,12 @@ function formatUsage(used: number | undefined, limit: number | null | undefined)
   const usedValue = (used || 0).toFixed(2)
   const limitValue = limit?.toFixed(2) || '∞'
   return `$${usedValue}/$${limitValue}`
+}
+
+function formatTokenUsage(used: number | undefined, limit: number | null | undefined): string {
+  const usedValue = (used || 0).toLocaleString()
+  const limitValue = limit != null ? limit.toLocaleString() : '∞'
+  return `${usedValue}/${limitValue}t`
 }
 
 function formatDaysRemaining(expiresAt: string): string {

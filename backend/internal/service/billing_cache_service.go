@@ -45,6 +45,10 @@ type subscriptionCacheData struct {
 	DailyUsage   float64
 	WeeklyUsage  float64
 	MonthlyUsage float64
+	// Token 用量
+	DailyTokenUsage   int64
+	WeeklyTokenUsage  int64
+	MonthlyTokenUsage int64
 	Version      int64
 }
 
@@ -88,6 +92,7 @@ type cacheWriteTask struct {
 	apiKeyID         int64
 	balance          float64
 	amount           float64
+	tokens           int64
 	subscriptionData *subscriptionCacheData
 }
 
@@ -224,7 +229,7 @@ func (s *BillingCacheService) cacheWriteWorker(ch <-chan cacheWriteTask) {
 			s.setSubscriptionCache(ctx, task.userID, task.groupID, task.subscriptionData)
 		case cacheWriteUpdateSubscriptionUsage:
 			if s.cache != nil {
-				if err := s.cache.UpdateSubscriptionUsage(ctx, task.userID, task.groupID, task.amount); err != nil {
+				if err := s.cache.UpdateSubscriptionUsage(ctx, task.userID, task.groupID, task.amount, task.tokens); err != nil {
 					logger.LegacyPrintf("service.billing_cache", "Warning: update subscription cache failed for user %d group %d: %v", task.userID, task.groupID, err)
 				}
 			}
@@ -447,6 +452,9 @@ func (s *BillingCacheService) convertFromPortsData(data *SubscriptionCacheData) 
 		DailyUsage:   data.DailyUsage,
 		WeeklyUsage:  data.WeeklyUsage,
 		MonthlyUsage: data.MonthlyUsage,
+		DailyTokenUsage:   data.DailyTokenUsage,
+		WeeklyTokenUsage:  data.WeeklyTokenUsage,
+		MonthlyTokenUsage: data.MonthlyTokenUsage,
 		Version:      data.Version,
 	}
 }
@@ -458,6 +466,9 @@ func (s *BillingCacheService) convertToPortsData(data *subscriptionCacheData) *S
 		DailyUsage:   data.DailyUsage,
 		WeeklyUsage:  data.WeeklyUsage,
 		MonthlyUsage: data.MonthlyUsage,
+		DailyTokenUsage:   data.DailyTokenUsage,
+		WeeklyTokenUsage:  data.WeeklyTokenUsage,
+		MonthlyTokenUsage: data.MonthlyTokenUsage,
 		Version:      data.Version,
 	}
 }
@@ -475,6 +486,9 @@ func (s *BillingCacheService) getSubscriptionFromDB(ctx context.Context, userID,
 		DailyUsage:   sub.DailyUsageUSD,
 		WeeklyUsage:  sub.WeeklyUsageUSD,
 		MonthlyUsage: sub.MonthlyUsageUSD,
+		DailyTokenUsage:   sub.DailyTokenUsage,
+		WeeklyTokenUsage:  sub.WeeklyTokenUsage,
+		MonthlyTokenUsage: sub.MonthlyTokenUsage,
 		Version:      sub.UpdatedAt.Unix(),
 	}, nil
 }
@@ -490,15 +504,15 @@ func (s *BillingCacheService) setSubscriptionCache(ctx context.Context, userID, 
 }
 
 // UpdateSubscriptionUsage 更新订阅用量缓存（同步调用）
-func (s *BillingCacheService) UpdateSubscriptionUsage(ctx context.Context, userID, groupID int64, costUSD float64) error {
+func (s *BillingCacheService) UpdateSubscriptionUsage(ctx context.Context, userID, groupID int64, costUSD float64, tokens int64) error {
 	if s.cache == nil {
 		return nil
 	}
-	return s.cache.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD)
+	return s.cache.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD, tokens)
 }
 
 // QueueUpdateSubscriptionUsage 异步更新订阅用量缓存
-func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64, costUSD float64) {
+func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64, costUSD float64, tokens int64) {
 	if s.cache == nil {
 		return
 	}
@@ -508,12 +522,13 @@ func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64
 		userID:  userID,
 		groupID: groupID,
 		amount:  costUSD,
+		tokens:  tokens,
 	}) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cacheWriteTimeout)
 	defer cancel()
-	if err := s.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD); err != nil {
+	if err := s.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD, tokens); err != nil {
 		logger.LegacyPrintf("service.billing_cache", "Warning: update subscription cache fallback failed for user %d group %d: %v", userID, groupID, err)
 	}
 }
@@ -932,6 +947,16 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 
 	if group.HasMonthlyLimit() && subData.MonthlyUsage >= *group.MonthlyLimitUSD {
 		return ErrMonthlyLimitExceeded
+	}
+	// Token 配额检查：nil=不限，0=禁止消耗，正数=上限
+	if group.HasDailyTokenLimit() && subData.DailyTokenUsage >= *group.DailyTokenLimit {
+		return ErrDailyTokenLimitExceeded
+	}
+	if group.HasWeeklyTokenLimit() && subData.WeeklyTokenUsage >= *group.WeeklyTokenLimit {
+		return ErrWeeklyTokenLimitExceeded
+	}
+	if group.HasMonthlyTokenLimit() && subData.MonthlyTokenUsage >= *group.MonthlyTokenLimit {
+		return ErrMonthlyTokenLimitExceeded
 	}
 
 	return nil

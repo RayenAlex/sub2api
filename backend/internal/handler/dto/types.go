@@ -99,11 +99,12 @@ type Group struct {
 	IsExclusive    bool    `json:"is_exclusive"`
 	Status         string  `json:"status"`
 
-	SubscriptionType          string   `json:"subscription_type"`
-	DailyLimitUSD             *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD            *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD           *float64 `json:"monthly_limit_usd"`
-	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
+	SubscriptionType          string            `json:"subscription_type"`
+	DailyLimitUSD             *float64          `json:"daily_limit_usd"`
+	WeeklyLimitUSD            *float64          `json:"weekly_limit_usd"`
+	MonthlyLimitUSD           *float64          `json:"monthly_limit_usd"`
+	TokenQuota                *TokenQuotaOutput `json:"token_quota,omitempty"`
+	LongContextPricingEnabled bool              `json:"long_context_pricing_enabled"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
 	AllowImageGeneration         bool    `json:"allow_image_generation"`
@@ -762,6 +763,10 @@ type UserSubscription struct {
 	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
 	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
 
+	DailyTokenUsage   int64 `json:"daily_token_usage"`
+	WeeklyTokenUsage  int64 `json:"weekly_token_usage"`
+	MonthlyTokenUsage int64 `json:"monthly_token_usage"`
+
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
@@ -815,4 +820,19 @@ type PromoCodeUsage struct {
 	UsedAt      time.Time `json:"used_at"`
 
 	User *User `json:"user,omitempty"`
+}
+
+// TokenQuotaWindowOutput 表示某个时间窗口的 token 配额配置
+// enabled=false 表示不限（limit 为 nil）
+// enabled=true 且 limit=0 表示禁止消耗 token
+type TokenQuotaWindowOutput struct {
+	Enabled bool   `json:"enabled"`
+	Limit   *int64 `json:"limit"`
+}
+
+// TokenQuotaOutput 表示完整的 token 配额配置
+type TokenQuotaOutput struct {
+	Daily   TokenQuotaWindowOutput `json:"daily"`
+	Weekly  TokenQuotaWindowOutput `json:"weekly"`
+	Monthly TokenQuotaWindowOutput `json:"monthly"`
 }

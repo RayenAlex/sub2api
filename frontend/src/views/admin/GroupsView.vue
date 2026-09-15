@@ -768,6 +768,70 @@
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
             </div>
+            <div class="border-t border-gray-200 pt-3 dark:border-dark-600">
+              <p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-dark-400">
+                {{ t("admin.groups.subscription.tokenQuotaTitle") }}
+              </p>
+              <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="createForm.token_quota.daily.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitDay") }}
+                  </label>
+                  <input
+                    v-model.number="createForm.token_quota.daily.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!createForm.token_quota.daily.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="createForm.token_quota.weekly.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitWeek") }}
+                  </label>
+                  <input
+                    v-model.number="createForm.token_quota.weekly.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!createForm.token_quota.weekly.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="createForm.token_quota.monthly.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitMonth") }}
+                  </label>
+                  <input
+                    v-model.number="createForm.token_quota.monthly.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!createForm.token_quota.monthly.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2568,6 +2632,70 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+            </div>
+            <div class="border-t border-gray-200 pt-3 dark:border-dark-600">
+              <p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-dark-400">
+                {{ t("admin.groups.subscription.tokenQuotaTitle") }}
+              </p>
+              <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="editForm.token_quota.daily.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitDay") }}
+                  </label>
+                  <input
+                    v-model.number="editForm.token_quota.daily.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!editForm.token_quota.daily.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="editForm.token_quota.weekly.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitWeek") }}
+                  </label>
+                  <input
+                    v-model.number="editForm.token_quota.weekly.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!editForm.token_quota.weekly.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="flex w-16 items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                    <input
+                      v-model="editForm.token_quota.monthly.enabled"
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {{ t("admin.groups.limitMonth") }}
+                  </label>
+                  <input
+                    v-model.number="editForm.token_quota.monthly.limit"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="input flex-1"
+                    :disabled="!editForm.token_quota.monthly.enabled"
+                    :placeholder="t('admin.groups.subscription.tokenQuotaHint')"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -5220,6 +5348,11 @@ const createForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  token_quota: {
+    daily: { enabled: false, limit: null as number | null },
+    weekly: { enabled: false, limit: null as number | null },
+    monthly: { enabled: false, limit: null as number | null },
+  },
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -5584,6 +5717,11 @@ const editForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  token_quota: {
+    daily: { enabled: false, limit: null as number | null },
+    weekly: { enabled: false, limit: null as number | null },
+    monthly: { enabled: false, limit: null as number | null },
+  },
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -6046,6 +6184,11 @@ const closeCreateModal = () => {
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
   createForm.monthly_limit_usd = null;
+  createForm.token_quota = {
+    daily: { enabled: false, limit: null },
+    weekly: { enabled: false, limit: null },
+    monthly: { enabled: false, limit: null },
+  };
   createForm.allow_image_generation = false;
   createForm.allow_batch_image_generation = false;
   createForm.image_rate_independent = false;
@@ -6138,6 +6281,22 @@ const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
   return true;
 };
 
+function buildTokenQuotaPayload(tq: {
+  daily: { enabled: boolean; limit: number | null }
+  weekly: { enabled: boolean; limit: number | null }
+  monthly: { enabled: boolean; limit: number | null }
+}) {
+  const window = (w: { enabled: boolean; limit: number | null }) =>
+    w.enabled
+      ? { enabled: true, limit: w.limit ?? 0 }
+      : { enabled: false, limit: null }
+  return {
+    daily: window(tq.daily),
+    weekly: window(tq.weekly),
+    monthly: window(tq.monthly),
+  }
+}
+
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -6186,6 +6345,7 @@ const handleCreateGroup = async () => {
       monthly_limit_usd: normalizeOptionalLimit(
         createForm.monthly_limit_usd as number | string | null,
       ),
+      token_quota: buildTokenQuotaPayload(createForm.token_quota),
       ...(Object.keys(videoModelPrices).length > 0
         ? { video_model_prices: videoModelPrices }
         : {}),
@@ -6228,6 +6388,7 @@ const handleCreateGroup = async () => {
     requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
     requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
+    requestData.token_quota = buildTokenQuotaPayload(editForm.token_quota);
     requestData.image_rate_multiplier = normalizeRateMultiplier(
       requestData.image_rate_multiplier,
     );
@@ -6301,6 +6462,20 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.daily_limit_usd = group.daily_limit_usd;
   editForm.weekly_limit_usd = group.weekly_limit_usd;
   editForm.monthly_limit_usd = group.monthly_limit_usd;
+  editForm.token_quota = {
+    daily: {
+      enabled: group.token_quota?.daily?.enabled ?? false,
+      limit: group.token_quota?.daily?.limit ?? null,
+    },
+    weekly: {
+      enabled: group.token_quota?.weekly?.enabled ?? false,
+      limit: group.token_quota?.weekly?.limit ?? null,
+    },
+    monthly: {
+      enabled: group.token_quota?.monthly?.enabled ?? false,
+      limit: group.token_quota?.monthly?.limit ?? null,
+    },
+  };
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.force_openai_fast = group.force_openai_fast ?? false;

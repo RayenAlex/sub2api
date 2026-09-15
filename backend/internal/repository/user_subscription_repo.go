@@ -388,13 +388,13 @@ func (r *userSubscriptionRepository) ResetUsageWindows(ctx context.Context, id i
 	client := clientFromContext(ctx, r.client)
 	update := client.UserSubscription.UpdateOneID(id)
 	if resetDaily {
-		update.SetDailyUsageUsd(0).SetDailyWindowStart(dailyStart)
+		update.SetDailyUsageUsd(0).SetDailyTokenUsage(0).SetDailyWindowStart(dailyStart)
 	}
 	if resetWeekly {
-		update.SetWeeklyUsageUsd(0).SetWeeklyWindowStart(periodicStart)
+		update.SetWeeklyUsageUsd(0).SetWeeklyTokenUsage(0).SetWeeklyWindowStart(periodicStart)
 	}
 	if resetMonthly {
-		update.SetMonthlyUsageUsd(0).SetMonthlyWindowStart(periodicStart)
+		update.SetMonthlyUsageUsd(0).SetMonthlyTokenUsage(0).SetMonthlyWindowStart(periodicStart)
 	}
 	_, err := update.Save(ctx)
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
@@ -409,7 +409,7 @@ func (r *userSubscriptionRepository) ResetDailyUsage(ctx context.Context, id int
 		query = query.Where(usersubscription.DailyWindowStartEQ(*expectedWindowStart))
 	}
 	n, err := query.
-		SetDailyUsageUsd(0).
+		SetDailyUsageUsd(0).SetDailyTokenUsage(0).
 		SetDailyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -424,7 +424,7 @@ func (r *userSubscriptionRepository) ResetWeeklyUsage(ctx context.Context, id in
 		query = query.Where(usersubscription.WeeklyWindowStartEQ(*expectedWindowStart))
 	}
 	n, err := query.
-		SetWeeklyUsageUsd(0).
+		SetWeeklyUsageUsd(0).SetWeeklyTokenUsage(0).
 		SetWeeklyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -439,7 +439,7 @@ func (r *userSubscriptionRepository) ResetMonthlyUsage(ctx context.Context, id i
 		query = query.Where(usersubscription.MonthlyWindowStartEQ(*expectedWindowStart))
 	}
 	n, err := query.
-		SetMonthlyUsageUsd(0).
+		SetMonthlyUsageUsd(0).SetMonthlyTokenUsage(0).
 		SetMonthlyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -468,7 +468,7 @@ func (r *userSubscriptionRepository) translateConditionalWindowReset(ctx context
 // IncrementUsage 原子性地累加订阅用量。
 // 限额检查已在请求前由 BillingCacheService.CheckBillingEligibility 完成，
 // 此处仅负责记录实际消费，确保消费数据的完整性。
-func (r *userSubscriptionRepository) IncrementUsage(ctx context.Context, id int64, costUSD float64) error {
+func (r *userSubscriptionRepository) IncrementUsage(ctx context.Context, id int64, costUSD float64, tokens int64) error {
 	const updateSQL = `
 		UPDATE user_subscriptions us
 		SET

@@ -43,6 +43,12 @@ const (
 	FieldWeeklyUsageUsd = "weekly_usage_usd"
 	// FieldMonthlyUsageUsd holds the string denoting the monthly_usage_usd field in the database.
 	FieldMonthlyUsageUsd = "monthly_usage_usd"
+	// FieldDailyTokenUsage holds the string denoting the daily_token_usage field in the database.
+	FieldDailyTokenUsage = "daily_token_usage"
+	// FieldWeeklyTokenUsage holds the string denoting the weekly_token_usage field in the database.
+	FieldWeeklyTokenUsage = "weekly_token_usage"
+	// FieldMonthlyTokenUsage holds the string denoting the monthly_token_usage field in the database.
+	FieldMonthlyTokenUsage = "monthly_token_usage"
 	// FieldAssignedBy holds the string denoting the assigned_by field in the database.
 	FieldAssignedBy = "assigned_by"
 	// FieldAssignedAt holds the string denoting the assigned_at field in the database.
@@ -106,6 +112,9 @@ var Columns = []string{
 	FieldDailyUsageUsd,
 	FieldWeeklyUsageUsd,
 	FieldMonthlyUsageUsd,
+	FieldDailyTokenUsage,
+	FieldWeeklyTokenUsage,
+	FieldMonthlyTokenUsage,
 	FieldAssignedBy,
 	FieldAssignedAt,
 	FieldNotes,
@@ -145,6 +154,12 @@ var (
 	DefaultWeeklyUsageUsd float64
 	// DefaultMonthlyUsageUsd holds the default value on creation for the "monthly_usage_usd" field.
 	DefaultMonthlyUsageUsd float64
+	// DefaultDailyTokenUsage holds the default value on creation for the "daily_token_usage" field.
+	DefaultDailyTokenUsage int64
+	// DefaultWeeklyTokenUsage holds the default value on creation for the "weekly_token_usage" field.
+	DefaultWeeklyTokenUsage int64
+	// DefaultMonthlyTokenUsage holds the default value on creation for the "monthly_token_usage" field.
+	DefaultMonthlyTokenUsage int64
 	// DefaultAssignedAt holds the default value on creation for the "assigned_at" field.
 	DefaultAssignedAt func() time.Time
 )
@@ -225,6 +240,21 @@ func ByWeeklyUsageUsd(opts ...sql.OrderTermOption) OrderOption {
 // ByMonthlyUsageUsd orders the results by the monthly_usage_usd field.
 func ByMonthlyUsageUsd(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMonthlyUsageUsd, opts...).ToFunc()
+}
+
+// ByDailyTokenUsage orders the results by the daily_token_usage field.
+func ByDailyTokenUsage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyTokenUsage, opts...).ToFunc()
+}
+
+// ByWeeklyTokenUsage orders the results by the weekly_token_usage field.
+func ByWeeklyTokenUsage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyTokenUsage, opts...).ToFunc()
+}
+
+// ByMonthlyTokenUsage orders the results by the monthly_token_usage field.
+func ByMonthlyTokenUsage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyTokenUsage, opts...).ToFunc()
 }
 
 // ByAssignedBy orders the results by the assigned_by field.
