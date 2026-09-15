@@ -164,7 +164,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		}
 	}
 	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
-	if isGeminiRawChatCompletionsModel(upstreamModel) {
+	if isGeminiModel(upstreamModel) {
 		upstreamBody, err = normalizeGeminiRawChatToolSchemas(upstreamBody)
 		if err != nil {
 			return nil, fmt.Errorf("normalize Gemini raw chat tool schemas: %w", err)
@@ -566,7 +566,7 @@ func buildOpenAIChatCompletionsURL(base string) string {
 	return buildOpenAIEndpointURL(base, "/v1/chat/completions")
 }
 
-func isGeminiRawChatCompletionsModel(model string) bool {
+func isGeminiModel(model string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gemini-")
 }
 

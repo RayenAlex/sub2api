@@ -40,6 +40,14 @@ func shouldSanitizeOpenAIResponsesToolSchemaPatterns(platform string) bool {
 }
 
 func sanitizeOpenAIResponsesToolSchemasForPlatform(body []byte, platform string) ([]byte, bool, error) {
+	return sanitizeOpenAIResponsesToolSchemasForModel(body, platform, "")
+}
+
+// sanitizeOpenAIResponsesToolSchemasForModel applies platform-wide Responses
+// compatibility repairs and the stricter Gemini schema rules when the selected
+// upstream model is Gemini. The model argument keeps the recursive schema
+// normalization scoped to the same Gemini requests that require it.
+func sanitizeOpenAIResponsesToolSchemasForModel(body []byte, platform, model string) ([]byte, bool, error) {
 	normalized := body
 	changed := false
 	if shouldRepairOpenAIResponsesNullToolSchemaType(platform) {
@@ -62,7 +70,57 @@ func sanitizeOpenAIResponsesToolSchemasForPlatform(body []byte, platform string)
 			changed = true
 		}
 	}
+	if isGeminiModel(model) {
+		next, normalizedGeminiSchema, err := normalizeGeminiOpenAIResponsesToolSchemas(normalized)
+		if err != nil {
+			return body, false, fmt.Errorf("normalize Gemini Responses tool schemas: %w", err)
+		}
+		if normalizedGeminiSchema {
+			normalized = next
+			changed = true
+		}
+	}
 	return normalized, changed, nil
+}
+
+// normalizeGeminiOpenAIResponsesToolSchemas adapts Responses API function-tool
+// parameter schemas to Gemini's stricter object-only keyword validation. In
+// particular, properties and required cannot appear on an effective non-object
+// schema such as type: ["string", "null"].
+func normalizeGeminiOpenAIResponsesToolSchemas(body []byte) ([]byte, bool, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body, false, fmt.Errorf("decode OpenAI Responses request: %w", err)
+	}
+
+	rawTools, ok := payload["tools"].([]any)
+	if !ok {
+		return body, false, nil
+	}
+
+	changed := false
+	for _, rawTool := range rawTools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		parameters, ok := tool["parameters"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if normalizeGeminiSchemaNode(parameters) {
+			changed = true
+		}
+	}
+	if !changed {
+		return body, false, nil
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return body, false, fmt.Errorf("encode normalized OpenAI Responses request: %w", err)
+	}
+	return normalized, true, nil
 }
 
 // sanitizeOpenAIResponsesToolSchemaPatterns removes only schema constraints
