@@ -17,8 +17,10 @@ type SubscriptionCacheData struct {
 	MonthlyTokenUsage int64
 	// SchemaVersion 缓存结构版本；缺失/旧版本视为 miss
 	SchemaVersion int64
-	Version      int64
+	Version       int64
 }
 
-// SubscriptionCacheSchemaV2 引入 token usage 字段后的订阅缓存结构版本。
-const SubscriptionCacheSchemaV2 int64 = 2
+// SubscriptionCacheSchemaV3 forces a database reload of V2 Redis entries.
+// V2 entries created before token-usage hydration was fixed can contain zero
+// counters even when the database shows an exhausted subscription.
+const SubscriptionCacheSchemaV3 int64 = 3

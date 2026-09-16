@@ -233,7 +233,7 @@ func (c *billingCache) parseSubscriptionCache(data map[string]string) (*service.
 		return nil, nil
 	}
 	schema, err := strconv.ParseInt(schemaStr, 10, 64)
-	if err != nil || schema != service.SubscriptionCacheSchemaV2 {
+	if err != nil || schema != service.SubscriptionCacheSchemaV3 {
 		return nil, nil
 	}
 	result.SchemaVersion = schema
@@ -257,13 +257,13 @@ func (c *billingCache) SetSubscriptionCache(ctx context.Context, userID, groupID
 	key := billingSubKey(userID, groupID)
 
 	fields := map[string]any{
-		subFieldStatus:       data.Status,
-		subFieldExpiresAt:    data.ExpiresAt.Unix(),
-		subFieldDailyUsage:   data.DailyUsage,
-		subFieldWeeklyUsage:  data.WeeklyUsage,
-		subFieldMonthlyUsage: data.MonthlyUsage,
-		subFieldVersion:      data.Version,
-		subFieldSchemaVersion:     service.SubscriptionCacheSchemaV2,
+		subFieldStatus:            data.Status,
+		subFieldExpiresAt:         data.ExpiresAt.Unix(),
+		subFieldDailyUsage:        data.DailyUsage,
+		subFieldWeeklyUsage:       data.WeeklyUsage,
+		subFieldMonthlyUsage:      data.MonthlyUsage,
+		subFieldVersion:           data.Version,
+		subFieldSchemaVersion:     service.SubscriptionCacheSchemaV3,
 		subFieldDailyTokenUsage:   data.DailyTokenUsage,
 		subFieldWeeklyTokenUsage:  data.WeeklyTokenUsage,
 		subFieldMonthlyTokenUsage: data.MonthlyTokenUsage,
