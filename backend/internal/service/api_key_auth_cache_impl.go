@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: subscription group token quota limits
+const apiKeyAuthSnapshotVersion = 26 // v26: API key auth projection includes subscription group token quota limits
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
