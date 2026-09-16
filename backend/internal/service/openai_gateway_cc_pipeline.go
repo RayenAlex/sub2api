@@ -182,6 +182,11 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	userAgent string,
 	grokCacheIdentity string,
 ) (*http.Response, error) {
+	body, devinSessionID, err := normalizeDevinConversationIdentity(c, body)
+	if err != nil {
+		return nil, err
+	}
+
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(body))
 	releaseUpstreamCtx()
@@ -223,6 +228,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	// 账号级请求头覆写：放在所有内置默认头（含 Grok CLI 身份头）之后应用，
 	// 使配置值获得除共享传输层强制头之外的最高优先级。
 	account.ApplyHeaderOverrides(upstreamReq.Header)
+	applyDevinConversationIdentityHeaders(upstreamReq.Header, devinSessionID)
 	applyOpenCodeSessionHeader(c, account, targetURL, upstreamReq.Header, body)
 	applyOpenCodeSessionAffinityHeader(c, account, upstreamReq.Header)
 	setOpenCodeCacheDiagnostic(c, buildOpenCodeCacheDiagnostic(s.cfg, account, explicitOpenAIHeaderSessionID(c), upstreamReq.Header, body))
