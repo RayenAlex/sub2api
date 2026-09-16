@@ -2,10 +2,12 @@ package service
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,4 +59,81 @@ func TestBuildOpenCodeCacheDiagnosticSeparatesContentStructureAndToolSchema(t *t
 
 	changedTool := buildOpenCodeCacheDiagnostic(cfg, account, "inbound-session", headers, []byte(strings.Replace(string(base), "lookup", "search", 1)))
 	require.NotEqual(t, first.ToolSchemaHMAC, changedTool.ToolSchemaHMAC)
+}
+
+func TestBuildOpenCodeCacheDiagnosticProfilesDevinLazyMCPPayload(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.JWT.Secret = "diagnostic-secret"
+	account := &Account{Credentials: map[string]any{openCodeCacheDiagnosticsCredentialKey: true}}
+	headers := http.Header{}
+	headers.Set("session_id", "canonical-session")
+	body := []byte(`{
+		"model":"devin/swe-2",
+		"prompt_cache_key":"canonical-session",
+		"instructions":"stable system instructions",
+		"input":[
+			{"role":"developer","content":"stable developer prefix"},
+			{"role":"user","content":"hello"}
+		],
+		"tools":[
+			{"type":"function","name":"mcp_list_servers","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_list_tools","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_call_tool","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_read_resource","parameters":{"type":"object"}},
+			{"type":"function","name":"read","parameters":{"type":"object"}}
+		]
+	}`)
+
+	diagnostic := buildOpenCodeCacheDiagnostic(cfg, account, "client-session", headers, body)
+	require.NotNil(t, diagnostic)
+	require.Equal(t, len(body), diagnostic.RequestBytes)
+	require.Positive(t, diagnostic.SystemPrefixBytes)
+	require.Positive(t, diagnostic.ToolSchemaBytes)
+	require.Equal(t, 5, diagnostic.ToolCount)
+	require.Equal(t, 4, diagnostic.MetaToolCount)
+	require.True(t, diagnostic.LazyMCP)
+	require.Equal(t, []string{"developer", "user"}, diagnostic.MessageRoles)
+	require.Equal(t, 2, diagnostic.MessageCount)
+	require.Equal(
+		t,
+		openCodeCacheDiagnosticHMAC(openCodeCacheDiagnosticKey(cfg), []byte("canonical-session")),
+		diagnostic.CanonicalSessionHMAC,
+	)
+	require.Equal(t, diagnostic.CanonicalSessionHMAC, diagnostic.PromptCacheKeyHMAC)
+}
+
+func TestAttachOpenCodeCacheDiagnosticCopiesContextValue(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	diagnostic := &OpenCodeCacheDiagnostic{Version: 1, RequestBytes: 123}
+	setOpenCodeCacheDiagnostic(c, diagnostic)
+
+	result := attachOpenCodeCacheDiagnostic(c, &OpenAIForwardResult{RequestID: "req-1"})
+
+	require.Same(t, diagnostic, result.CacheDiagnostic)
+	require.Nil(t, attachOpenCodeCacheDiagnostic(c, nil))
+}
+
+func TestBuildOpenCodeCacheDiagnosticRecognizesChatCompletionsMetaTools(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.JWT.Secret = "diagnostic-secret"
+	account := &Account{Credentials: map[string]any{openCodeCacheDiagnosticsCredentialKey: true}}
+	body := []byte(`{
+		"model":"devin/swe-2",
+		"messages":[{"role":"system","content":"stable system"},{"role":"user","content":"hello"}],
+		"tools":[
+			{"type":"function","function":{"name":"mcp_list_servers","parameters":{"type":"object"}}},
+			{"type":"function","function":{"name":"mcp_list_tools","parameters":{"type":"object"}}},
+			{"type":"function","function":{"name":"mcp_call_tool","parameters":{"type":"object"}}},
+			{"type":"function","function":{"name":"mcp_read_resource","parameters":{"type":"object"}}}
+		]
+	}`)
+
+	diagnostic := buildOpenCodeCacheDiagnostic(cfg, account, "", nil, body)
+
+	require.NotNil(t, diagnostic)
+	require.Equal(t, 4, diagnostic.ToolCount)
+	require.Equal(t, 4, diagnostic.MetaToolCount)
+	require.True(t, diagnostic.LazyMCP)
+	require.Positive(t, diagnostic.SystemPrefixBytes)
+	require.Positive(t, diagnostic.ToolSchemaBytes)
 }

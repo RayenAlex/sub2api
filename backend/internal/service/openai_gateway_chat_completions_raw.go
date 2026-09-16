@@ -158,14 +158,19 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		if err != nil {
 			return nil, fmt.Errorf("normalize Grok chat reasoning effort: %w", err)
 		}
+		upstreamBody, err = sanitizeGrokUnsupportedFields(upstreamBody)
+		if err != nil {
+			return nil, fmt.Errorf("sanitize Grok unsupported fields: %w", err)
+		}
 	}
 	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
-	if isGeminiRawChatCompletionsModel(upstreamModel) {
+	if isGeminiModel(upstreamModel) {
 		upstreamBody, err = normalizeGeminiRawChatToolSchemas(upstreamBody)
 		if err != nil {
 			return nil, fmt.Errorf("normalize Gemini raw chat tool schemas: %w", err)
 		}
 	}
+	upstreamBody = clampOllamaCloudUpstreamMaxTokens(account, upstreamBody)
 
 	logger.L().Debug("openai chat_completions raw: forwarding without protocol conversion",
 		zap.Int64("account_id", account.ID),
@@ -248,144 +253,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		addOpenAIUsage(&result.Usage, bridgeUsage)
 		result.UpstreamEndpoint = grokChatRawEndpoint
 	}
-	if result != nil {
-		result.CacheDiagnostic = openCodeCacheDiagnosticFromContext(c)
-	}
 	return result, forwardErr
-}
-
-// isGeminiRawChatCompletionsModel restricts schema normalization to the raw
-// OpenAI-compatible route for Gemini models. Other compatible upstreams retain
-// their original request payload unchanged.
-func isGeminiRawChatCompletionsModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gemini-")
-}
-
-// normalizeGeminiRawChatToolSchemas adapts OpenAI-compatible function schemas
-// to Gemini's stricter Schema validation: arrays need `items`, while
-// `properties` and `required` are object-only fields.
-func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
-	var payload map[string]any
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("decode raw chat completion request: %w", err)
-	}
-
-	rawTools, ok := payload["tools"].([]any)
-	if !ok {
-		return body, nil
-	}
-
-	changed := false
-	for _, rawTool := range rawTools {
-		tool, ok := rawTool.(map[string]any)
-		if !ok {
-			continue
-		}
-		function, ok := tool["function"].(map[string]any)
-		if !ok {
-			continue
-		}
-		parameters, ok := function["parameters"].(map[string]any)
-		if !ok {
-			continue
-		}
-		if normalizeGeminiSchemaNode(parameters) {
-			changed = true
-		}
-	}
-	if !changed {
-		return body, nil
-	}
-
-	normalized, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("encode normalized raw chat completion request: %w", err)
-	}
-	return normalized, nil
-}
-
-func normalizeGeminiSchemaNode(value any) bool {
-	switch node := value.(type) {
-	case map[string]any:
-		changed := false
-		effectiveType, hasType := effectiveGeminiSchemaType(node)
-		if hasType && strings.EqualFold(effectiveType, "array") {
-			if items, exists := node["items"]; !exists || items == nil {
-				node["items"] = map[string]any{"type": "string"}
-				changed = true
-			}
-		}
-		if !hasType {
-			if _, hasProperties := node["properties"]; hasProperties {
-				node["type"] = "object"
-				effectiveType = "object"
-				changed = true
-			}
-		} else if !strings.EqualFold(effectiveType, "object") {
-			if _, exists := node["properties"]; exists {
-				delete(node, "properties")
-				changed = true
-			}
-			if _, exists := node["required"]; exists {
-				delete(node, "required")
-				changed = true
-			}
-		}
-		for _, key := range []string{"properties", "items", "additionalProperties"} {
-			if child, exists := node[key]; exists {
-				if key == "properties" {
-					if childProperties, ok := child.(map[string]any); ok {
-						for _, child := range childProperties {
-							if normalizeGeminiSchemaNode(child) {
-								changed = true
-							}
-						}
-					}
-				} else if key == "additionalProperties" {
-					if _, isBool := child.(bool); !isBool && normalizeGeminiSchemaNode(child) {
-						changed = true
-					}
-				} else if normalizeGeminiSchemaNode(child) {
-					changed = true
-				}
-			}
-		}
-		return changed
-	case []any:
-		changed := false
-		for _, child := range node {
-			if normalizeGeminiSchemaNode(child) {
-				changed = true
-			}
-		}
-		return changed
-	default:
-		return false
-	}
-}
-
-func effectiveGeminiSchemaType(node map[string]any) (string, bool) {
-	switch valueType := node["type"].(type) {
-	case string:
-		return valueType, true
-	case []any:
-		selected := ""
-		for _, rawType := range valueType {
-			typeName, ok := rawType.(string)
-			if !ok {
-				continue
-			}
-			if selected == "" || strings.EqualFold(typeName, "object") {
-				selected = typeName
-			}
-		}
-		if selected == "" {
-			return "", false
-		}
-		return selected, true
-	default:
-		return "", false
-	}
 }
 
 func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, error) {
@@ -500,7 +368,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 
 	resultWithUsage := func() *OpenAIForwardResult {
-		return &OpenAIForwardResult{
+		return attachOpenCodeCacheDiagnostic(c, &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,
 			Usage:                         usage,
@@ -515,7 +383,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
-		}
+		})
 	}
 
 	scanErr := scanner.Err()
@@ -669,7 +537,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	c.Writer.WriteHeader(http.StatusOK)
 	_, _ = c.Writer.Write(respBody)
 
-	return &OpenAIForwardResult{
+	return attachOpenCodeCacheDiagnostic(c, &OpenAIForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
 		Usage:                         usage,
@@ -683,7 +551,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
-	}, nil
+	}), nil
 }
 
 // buildOpenAIChatCompletionsURL 拼接上游 Chat Completions 端点 URL。
@@ -696,4 +564,132 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 // 与 buildOpenAIResponsesURL 是姐妹函数。
 func buildOpenAIChatCompletionsURL(base string) string {
 	return buildOpenAIEndpointURL(base, "/v1/chat/completions")
+}
+
+func isGeminiModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gemini-")
+}
+
+func normalizeGeminiRawChatToolSchemas(body []byte) ([]byte, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("decode raw chat completion request: %w", err)
+	}
+
+	rawTools, ok := payload["tools"].([]any)
+	if !ok {
+		return body, nil
+	}
+
+	changed := false
+	for _, rawTool := range rawTools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		function, ok := tool["function"].(map[string]any)
+		if !ok {
+			continue
+		}
+		parameters, ok := function["parameters"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if normalizeGeminiSchemaNode(parameters) {
+			changed = true
+		}
+	}
+	if !changed {
+		return body, nil
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("encode normalized raw chat completion request: %w", err)
+	}
+	return normalized, nil
+}
+
+func normalizeGeminiSchemaNode(value any) bool {
+	switch node := value.(type) {
+	case map[string]any:
+		changed := false
+		effectiveType, hasType := effectiveGeminiSchemaType(node)
+		if hasType && strings.EqualFold(effectiveType, "array") {
+			if items, exists := node["items"]; !exists || items == nil {
+				node["items"] = map[string]any{"type": "string"}
+				changed = true
+			}
+		}
+		if !hasType {
+			if _, hasProperties := node["properties"]; hasProperties {
+				node["type"] = "object"
+				effectiveType = "object"
+				changed = true
+			}
+		} else if !strings.EqualFold(effectiveType, "object") {
+			if _, exists := node["properties"]; exists {
+				delete(node, "properties")
+				changed = true
+			}
+			if _, exists := node["required"]; exists {
+				delete(node, "required")
+				changed = true
+			}
+		}
+		for _, key := range []string{"properties", "items", "additionalProperties"} {
+			if child, exists := node[key]; exists {
+				if key == "properties" {
+					if childProperties, ok := child.(map[string]any); ok {
+						for _, child := range childProperties {
+							if normalizeGeminiSchemaNode(child) {
+								changed = true
+							}
+						}
+					}
+				} else if key == "additionalProperties" {
+					if _, isBool := child.(bool); !isBool && normalizeGeminiSchemaNode(child) {
+						changed = true
+					}
+				} else if normalizeGeminiSchemaNode(child) {
+					changed = true
+				}
+			}
+		}
+		return changed
+	case []any:
+		changed := false
+		for _, child := range node {
+			if normalizeGeminiSchemaNode(child) {
+				changed = true
+			}
+		}
+		return changed
+	default:
+		return false
+	}
+}
+
+func effectiveGeminiSchemaType(node map[string]any) (string, bool) {
+	switch valueType := node["type"].(type) {
+	case string:
+		return valueType, true
+	case []any:
+		selected := ""
+		for _, rawType := range valueType {
+			typeName, ok := rawType.(string)
+			if !ok {
+				continue
+			}
+			if selected == "" || strings.EqualFold(typeName, "object") {
+				selected = typeName
+			}
+		}
+		if selected == "" {
+			return "", false
+		}
+		return selected, true
+	default:
+		return "", false
+	}
 }

@@ -270,7 +270,7 @@ func TestSanitizeOpenAIResponsesToolSchemasForPlatform_ReplayBoundary(t *testing
 	// A malformed tool definition may be replayed after account failover. Every
 	// compatible account must repair it, while non-OpenAI providers retain their
 	// supported regex semantics.
-	for _, platform := range []string{PlatformAnthropic, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax} {
 		t.Run(platform, func(t *testing.T) {
 			for attempt := 0; attempt < 2; attempt++ {
 				normalized, changed, err := sanitizeOpenAIResponsesToolSchemasForPlatform(body, platform)
@@ -651,4 +651,20 @@ func BenchmarkSanitizeOpenAIResponsesToolParameterTypes_ByteSpanPatch(b *testing
 	for i := 0; i < b.N; i++ {
 		_, _, _ = sanitizeOpenAIResponsesToolParameterTypes(body)
 	}
+}
+
+func TestSanitizeOpenAIResponsesToolSchemasForModel_GeminiRemovesNestedObjectOnlyFields(t *testing.T) {
+	body := []byte(`{"model":"gemini-3.8-flash-high","tools":[{"type":"function","name":"resize","parameters":{"type":"object","properties":{"size":{"type":["string","null"],"properties":{"width":{"type":"integer"}},"required":["width"]},"mode":{"type":["object","null"],"properties":{"name":{"type":"string"}},"required":["name"]}}}}]}`)
+
+	normalized, changed, err := sanitizeOpenAIResponsesToolSchemasForModel(body, PlatformOpenAI, "gemini-3.8-flash-high")
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	// Gemini rejects properties/required on a non-object union, while object
+	// unions must retain their object-only schema keywords.
+	require.False(t, gjson.GetBytes(normalized, "tools.0.parameters.properties.size.properties").Exists())
+	require.False(t, gjson.GetBytes(normalized, "tools.0.parameters.properties.size.required").Exists())
+	require.Equal(t, "string", gjson.GetBytes(normalized, "tools.0.parameters.properties.size.type.0").String())
+	require.True(t, gjson.GetBytes(normalized, "tools.0.parameters.properties.mode.properties").Exists())
+	require.True(t, gjson.GetBytes(normalized, "tools.0.parameters.properties.mode.required").Exists())
 }

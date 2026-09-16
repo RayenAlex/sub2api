@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -83,10 +82,9 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	if account.Platform == PlatformOpenAI {
 		policyBody, changed, policyErr := ApplyOpenAIReasoningEffortPolicyFromContext(ctx, chatBody)
 		if policyErr != nil {
-			var overLimit *ReasoningEffortOverLimitError
-			if errors.As(policyErr, &overLimit) {
+			if IsReasoningEffortPolicyDenied(policyErr) {
 				MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
-				writeAnthropicError(c, http.StatusForbidden, "forbidden_error", overLimit.Error())
+				writeAnthropicError(c, http.StatusForbidden, "forbidden_error", policyErr.Error())
 			}
 			return nil, policyErr
 		}
@@ -133,10 +131,13 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	}
 
 	// 5. Convert response
+	var result *OpenAIForwardResult
 	if clientStream {
-		return s.streamChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		result, err = s.streamChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	} else {
+		result, err = s.bufferChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
-	return s.bufferChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return attachOpenCodeCacheDiagnostic(c, result), err
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(

@@ -561,6 +561,12 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						s.handleOpenAIStreamTerminalAccountSideEffects(c, account, dataBytes, failedMessage, resp.Header, mappedModel)
 						bareErrorAccountSideEffectsPending = false
 					}
+					if eventType == "response.failed" {
+						// Once semantic output is committed, failover replay is unsafe. Keep
+						// the terminal event on the existing stream, but retain the upstream
+						// request ID and payload for operations diagnostics.
+						s.recordOpenAIStreamUpstreamError(c, account, false, upstreamRequestID, "stream_failed", dataBytes, failedMessage)
+					}
 				}
 				if !outputStarted {
 					shouldFailover := false
@@ -1233,6 +1239,9 @@ func mergeOpenAIUsageNonZero(dst *OpenAIUsage, src OpenAIUsage) {
 	if src.ImageInputTokens > 0 {
 		dst.ImageInputTokens = src.ImageInputTokens
 	}
+	if src.ImageCacheReadTokens > 0 {
+		dst.ImageCacheReadTokens = src.ImageCacheReadTokens
+	}
 	if src.OutputTokens > 0 {
 		dst.OutputTokens = src.OutputTokens
 	}
@@ -1851,10 +1860,7 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 	if rewritten, changed := sanitizeOpenAICapacityShedErrorCodeForClient(updated); changed {
 		updated = rewritten
 	}
-	if !isFailedEvent {
-		return updated, !bytes.Equal(updated, payload)
-	}
-	if clientOutputStarted && isOpenAIContextWindowError(extractOpenAISSEErrorMessage(payload), payload) {
+	if (clientOutputStarted || eventType == "error") && isOpenAIContextWindowError(extractOpenAISSEErrorMessage(payload), payload) {
 		errorPath := ""
 		switch {
 		case gjson.GetBytes(updated, "response.error").Exists():
@@ -1874,6 +1880,9 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 			}
 			updated = next
 		}
+	}
+	if !isFailedEvent {
+		return updated, !bytes.Equal(updated, payload)
 	}
 	if !gjson.GetBytes(updated, "response").Exists() {
 		return updated, !bytes.Equal(updated, payload)

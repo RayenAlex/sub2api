@@ -87,6 +87,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		}
 		return nil, err
 	}
+	// /v1/responses 降级到 raw CC 的出站与 forwardAsRawChatCompletions 共用同一个
+	// 独立 Ollama Cloud token 钩子；chatReq.Model 已是模型映射后的 upstreamModel。
+	chatBody = clampOllamaCloudUpstreamMaxTokens(account, chatBody)
 	// Keep the final outbound tier for usage-time reconciliation. A policy
 	// filter that removes the field therefore leaves this nil.
 	serviceTier := extractOpenAIServiceTierFromBody(chatBody)
@@ -119,10 +122,13 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		return s.handleErrorResponse(ctx, resp, c, account, chatBody, billingModel)
 	}
 
+	var result *OpenAIForwardResult
 	if clientStream {
-		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		result, err = s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	} else {
+		result, err = s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
-	return s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return attachOpenCodeCacheDiagnostic(c, result), err
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
