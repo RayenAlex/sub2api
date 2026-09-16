@@ -259,3 +259,28 @@ func TestReleaseUsageBillingBatchImageBalance_SkipsWhenHoldNeverReserved(t *test
 	require.NoError(t, tx.Commit())
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestApplyUsageBillingEffects_TracksTokensForFreeSubscription(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+
+	subscriptionID := int64(91)
+	mock.ExpectExec(`(?s)UPDATE user_subscriptions.*daily_token_usage = us.daily_token_usage \+ \$3.*`).
+		WithArgs(0.0, subscriptionID, int64(1_000)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	err = (&usageBillingRepository{}).applyUsageBillingEffects(ctx, tx, &service.UsageBillingCommand{
+		SubscriptionID:     &subscriptionID,
+		SubscriptionTokens: 1_000,
+	}, &service.UsageBillingApplyResult{Applied: true})
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
