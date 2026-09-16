@@ -6286,6 +6286,7 @@ function buildTokenQuotaPayload(tq: {
   weekly: { enabled: boolean; limit: number | null }
   monthly: { enabled: boolean; limit: number | null }
 }) {
+  // enabled+留空 → limit=0（禁止消耗）；未启用 → limit=null（不限）
   const window = (w: { enabled: boolean; limit: number | null }) =>
     w.enabled
       ? { enabled: true, limit: w.limit ?? 0 }
@@ -6388,7 +6389,7 @@ const handleCreateGroup = async () => {
     requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
     requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
-    requestData.token_quota = buildTokenQuotaPayload(editForm.token_quota);
+    requestData.token_quota = buildTokenQuotaPayload(createForm.token_quota);
     requestData.image_rate_multiplier = normalizeRateMultiplier(
       requestData.image_rate_multiplier,
     );
@@ -6736,6 +6737,7 @@ const handleUpdateGroup = async () => {
     payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
     payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
     payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
+    payload.token_quota = buildTokenQuotaPayload(editForm.token_quota);
     payload.image_rate_multiplier = normalizeRateMultiplier(
       payload.image_rate_multiplier,
     );

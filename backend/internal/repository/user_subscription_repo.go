@@ -475,6 +475,9 @@ func (r *userSubscriptionRepository) IncrementUsage(ctx context.Context, id int6
 			daily_usage_usd = us.daily_usage_usd + $1,
 			weekly_usage_usd = us.weekly_usage_usd + $1,
 			monthly_usage_usd = us.monthly_usage_usd + $1,
+			daily_token_usage = us.daily_token_usage + $3,
+			weekly_token_usage = us.weekly_token_usage + $3,
+			monthly_token_usage = us.monthly_token_usage + $3,
 			updated_at = NOW()
 		FROM groups g
 		WHERE us.id = $2

@@ -608,13 +608,11 @@ func tokenLimitFromInput(q *TokenQuotaInput, window string) *int64 {
 	if !w.Enabled {
 		return nil
 	}
-	if w.Limit == nil {
-		return nil
-	}
 	return w.Limit
 }
 
 var ErrTokenQuotaNegativeLimit = infraerrors.BadRequest("TOKEN_QUOTA_NEGATIVE_LIMIT", "token quota limit must be >= 0")
+var ErrTokenQuotaLimitRequired = infraerrors.BadRequest("TOKEN_QUOTA_LIMIT_REQUIRED", "token quota limit is required when enabled")
 
 // validateTokenQuota 校验 token 配额：启用时 limit 必须为非负数（nil 视为不限）
 func validateTokenQuota(q *TokenQuotaInput) error {
@@ -622,6 +620,9 @@ func validateTokenQuota(q *TokenQuotaInput) error {
 		return nil
 	}
 	for _, w := range []TokenQuotaWindowInput{q.Daily, q.Weekly, q.Monthly} {
+		if w.Enabled && w.Limit == nil {
+			return ErrTokenQuotaLimitRequired
+		}
 		if w.Enabled && w.Limit != nil && *w.Limit < 0 {
 			return ErrTokenQuotaNegativeLimit
 		}
