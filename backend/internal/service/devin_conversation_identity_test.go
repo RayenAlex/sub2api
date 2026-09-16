@@ -4,11 +4,13 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -139,4 +141,47 @@ func TestSendCCUpstreamRequestInjectsDevinIdentity(t *testing.T) {
 	require.Equal(t, want, upstream.lastReq.Header.Get("session_id"))
 	require.Equal(t, want, upstream.lastReq.Header.Get("X-Session-Id"))
 	require.Equal(t, want, gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+}
+
+func TestBuildUpstreamRequestOpenAIPassthroughCapturesDevinPromptProfile(t *testing.T) {
+	c := newDevinConversationIdentityContext(t, 47, map[string]string{
+		"X-Session-Id": "responses-profile",
+	})
+	body := []byte(`{
+		"model":"devin/swe-2",
+		"instructions":"stable system",
+		"input":[{"role":"user","content":"hello"}],
+		"tools":[
+			{"type":"function","name":"mcp_list_servers","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_list_tools","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_call_tool","parameters":{"type":"object"}},
+			{"type":"function","name":"mcp_read_resource","parameters":{"type":"object"}}
+		]
+	}`)
+	account := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			openCodeCacheDiagnosticsCredentialKey: true,
+		},
+	}
+	cfg := &config.Config{}
+	cfg.JWT.Secret = "diagnostic-secret"
+
+	req, err := (&OpenAIGatewayService{cfg: cfg}).buildUpstreamRequestOpenAIPassthrough(
+		context.Background(),
+		c,
+		account,
+		body,
+		"upstream-token",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, req)
+
+	diagnostic := openCodeCacheDiagnosticFromContext(c)
+	require.NotNil(t, diagnostic)
+	require.True(t, diagnostic.LazyMCP)
+	require.Equal(t, 4, diagnostic.ToolCount)
+	require.NotEmpty(t, diagnostic.CanonicalSessionHMAC)
+	require.Equal(t, diagnostic.CanonicalSessionHMAC, diagnostic.PromptCacheKeyHMAC)
 }

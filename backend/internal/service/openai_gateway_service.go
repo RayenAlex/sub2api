@@ -294,8 +294,9 @@ type OpenAIForwardResult struct {
 	SearchCount int
 	// AudioUsage carries Voice billing units when present.
 	AudioUsage *AudioUsage
-	// CacheDiagnostic is populated only by the explicitly opted-in raw Chat
-	// Completions path and persists only non-reversible HMAC diagnostics.
+	// CacheDiagnostic is populated only for explicitly opted-in OpenAI-compatible
+	// Chat Completions and Responses passthrough requests. It persists only
+	// non-reversible HMACs and bounded prompt-profile measurements.
 	CacheDiagnostic *OpenCodeCacheDiagnostic
 
 	wsReplayInput                []json.RawMessage

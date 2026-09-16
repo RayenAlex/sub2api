@@ -368,7 +368,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 
 	resultWithUsage := func() *OpenAIForwardResult {
-		return &OpenAIForwardResult{
+		return attachOpenCodeCacheDiagnostic(c, &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,
 			Usage:                         usage,
@@ -383,7 +383,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
-		}
+		})
 	}
 
 	scanErr := scanner.Err()
@@ -537,7 +537,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	c.Writer.WriteHeader(http.StatusOK)
 	_, _ = c.Writer.Write(respBody)
 
-	return &OpenAIForwardResult{
+	return attachOpenCodeCacheDiagnostic(c, &OpenAIForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
 		Usage:                         usage,
@@ -551,7 +551,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
-	}, nil
+	}), nil
 }
 
 // buildOpenAIChatCompletionsURL 拼接上游 Chat Completions 端点 URL。
