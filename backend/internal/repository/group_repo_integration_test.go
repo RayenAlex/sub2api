@@ -155,6 +155,40 @@ func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligib
 	s.Require().Equal(1, outboxCount)
 }
 
+func (s *GroupRepoSuite) TestTokenQuotaRoundTripsAcrossCreateAndUpdate() {
+	dailyLimit := int64(50_000_000)
+	group := &service.Group{
+		Name:             "token-quota-round-trip",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeSubscription,
+		DailyTokenLimit:  &dailyLimit,
+	}
+
+	s.Require().NoError(s.repo.Create(s.ctx, group))
+
+	created, err := s.repo.GetByID(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().NotNil(created.DailyTokenLimit)
+	s.Require().Equal(dailyLimit, *created.DailyTokenLimit)
+	s.Require().Nil(created.WeeklyTokenLimit)
+	s.Require().Nil(created.MonthlyTokenLimit)
+
+	weeklyLimit := int64(60_000_000)
+	created.DailyTokenLimit = nil
+	created.WeeklyTokenLimit = &weeklyLimit
+	s.Require().NoError(s.repo.Update(s.ctx, created))
+
+	updated, err := s.repo.GetByID(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Nil(updated.DailyTokenLimit)
+	s.Require().NotNil(updated.WeeklyTokenLimit)
+	s.Require().Equal(weeklyLimit, *updated.WeeklyTokenLimit)
+	s.Require().Nil(updated.MonthlyTokenLimit)
+}
+
 func (s *GroupRepoSuite) TestGetByID_NotFound() {
 	_, err := s.repo.GetByID(s.ctx, 999999)
 	s.Require().Error(err, "expected error for non-existent ID")
