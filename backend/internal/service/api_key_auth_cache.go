@@ -67,6 +67,9 @@ type APIKeyAuthGroupSnapshot struct {
 	DailyLimitUSD                   *float64                      `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD                  *float64                      `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD                 *float64                      `json:"monthly_limit_usd,omitempty"`
+	DailyTokenLimit                 *int64                        `json:"daily_token_limit,omitempty"`
+	WeeklyTokenLimit                *int64                        `json:"weekly_token_limit,omitempty"`
+	MonthlyTokenLimit               *int64                        `json:"monthly_token_limit,omitempty"`
 	AllowImageGeneration            bool                          `json:"allow_image_generation"`
 	AllowBatchImageGeneration       bool                          `json:"allow_batch_image_generation"`
 	ImageRateIndependent            bool                          `json:"image_rate_independent"`
