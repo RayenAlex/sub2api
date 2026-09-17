@@ -2328,6 +2328,8 @@ func supportsOpenAIReasoningEffortMax(model string) bool {
 		return true
 	case normalized == "k3" || strings.HasPrefix(normalized, "k3-"):
 		return true
+	case strings.HasPrefix(normalized, "swe-"):
+		return true
 	default:
 		return false
 	}
