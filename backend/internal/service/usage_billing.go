@@ -37,9 +37,9 @@ type UsageBillingCommand struct {
 	ImageCount          int
 	MediaType           string
 
-	BalanceCost         float64
-	SubscriptionCost    float64
-	// SubscriptionTokens 订阅模式下本次请求实际消耗的 token 数（非订阅为 0）
+	BalanceCost      float64
+	SubscriptionCost float64
+	// SubscriptionTokens 订阅模式下本次计入配额的 token 数（已应用高峰倍率；非订阅为 0）
 	SubscriptionTokens  int64
 	APIKeyQuotaCost     float64
 	APIKeyRateLimitCost float64

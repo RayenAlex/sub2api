@@ -1004,6 +1004,10 @@ export default {
         defaultValidityDays: 'Default Validity (Days)',
         validityHint: 'Number of days the subscription is valid when assigned to a user',
         noLimit: 'No limit',
+        limitMode: 'Limit Mode',
+        limitModeUsd: 'Amount Limit (USD)',
+        limitModeToken: 'Token Quota',
+        limitModeHint: 'Choose one: limit by USD amount or by token count. Cannot enable both.',
         tokenQuotaTitle: 'Token Quota (tokens)',
         tokenQuotaHint: 'Enabled + empty = deny (0), enter value = daily/weekly/monthly cap'
       },

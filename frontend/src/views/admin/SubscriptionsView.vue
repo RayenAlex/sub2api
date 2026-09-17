@@ -358,12 +358,68 @@
                 </div>
               </div>
 
+              <!-- Token quota usage -->
+              <div v-if="row.group?.token_quota?.daily?.enabled" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.daily') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.daily_token_usage, row.group?.token_quota?.daily?.limit ?? null)"
+                      :style="{ width: getProgressWidth(row.daily_token_usage, row.group?.token_quota?.daily?.limit ?? null) }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ formatTokenUsage(row.daily_token_usage) }}
+                    <span class="text-gray-400">/</span>
+                    {{ formatTokenLimit(row.group?.token_quota?.daily?.limit) }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="row.group?.token_quota?.weekly?.enabled" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.weekly') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.weekly_token_usage, row.group?.token_quota?.weekly?.limit ?? null)"
+                      :style="{ width: getProgressWidth(row.weekly_token_usage, row.group?.token_quota?.weekly?.limit ?? null) }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ formatTokenUsage(row.weekly_token_usage) }}
+                    <span class="text-gray-400">/</span>
+                    {{ formatTokenLimit(row.group?.token_quota?.weekly?.limit) }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="row.group?.token_quota?.monthly?.enabled" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.monthly') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-purple-200 dark:bg-purple-900/40">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.monthly_token_usage, row.group?.token_quota?.monthly?.limit ?? null)"
+                      :style="{ width: getProgressWidth(row.monthly_token_usage, row.group?.token_quota?.monthly?.limit ?? null) }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ formatTokenUsage(row.monthly_token_usage) }}
+                    <span class="text-gray-400">/</span>
+                    {{ formatTokenLimit(row.group?.token_quota?.monthly?.limit) }}
+                  </span>
+                </div>
+              </div>
+
               <!-- No Limits - Unlimited badge -->
               <div
                 v-if="
                   !row.group?.daily_limit_usd &&
                   !row.group?.weekly_limit_usd &&
-                  !row.group?.monthly_limit_usd
+                  !row.group?.monthly_limit_usd &&
+                  !row.group?.token_quota?.daily?.enabled &&
+                  !row.group?.token_quota?.weekly?.enabled &&
+                  !row.group?.token_quota?.monthly?.enabled
                 "
                 class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 dark:from-emerald-900/20 dark:to-teal-900/20"
               >
@@ -1526,6 +1582,14 @@ const getProgressWidth = (used: number | null | undefined, limit: number | null)
   const usedValue = used ?? 0
   const percentage = Math.min((usedValue / limit) * 100, 100)
   return `${percentage}%`
+}
+
+const formatTokenUsage = (used: number | null | undefined): string => {
+  return (used ?? 0).toLocaleString()
+}
+
+const formatTokenLimit = (limit: number | null | undefined): string => {
+  return limit != null ? limit.toLocaleString() + 't' : '∞'
 }
 
 const getProgressClass = (used: number | null | undefined, limit: number | null): string => {

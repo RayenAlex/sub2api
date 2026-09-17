@@ -8,6 +8,7 @@ export default {
     daily: 'Daily',
     weekly: 'Weekly',
     monthly: 'Monthly',
+    tokenQuota: 'Token',
     daysRemaining: '{days} days left',
     expired: 'Expired',
     expiresToday: 'Expires today',

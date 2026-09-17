@@ -236,3 +236,51 @@ func TestPeakMultiplier_SnapshotRoundTrip(t *testing.T) {
 		t.Fatalf("off-peak multiplier after round-trip: got %v, want 1.0", got)
 	}
 }
+
+func TestTokenQuotaUsageAt_AppliesPeakMultiplier(t *testing.T) {
+	peakGroup := newPeakGroup(true, "14:00", "18:00", 3.0)
+	tests := []struct {
+		name   string
+		group  *Group
+		tokens int64
+		at     time.Time
+		want   int64
+	}{
+		{
+			name:   "peak three times",
+			group:  peakGroup,
+			tokens: 100_000,
+			at:     at(15, 30),
+			want:   300_000,
+		},
+		{
+			name:   "off peak stays raw",
+			group:  peakGroup,
+			tokens: 100_000,
+			at:     at(20, 0),
+			want:   100_000,
+		},
+		{
+			name:   "fractional multiplier rounds up",
+			group:  newPeakGroup(true, "14:00", "18:00", 1.5),
+			tokens: 3,
+			at:     at(15, 30),
+			want:   5,
+		},
+		{
+			name:   "zero multiplier is free",
+			group:  newPeakGroup(true, "14:00", "18:00", 0),
+			tokens: 100_000,
+			at:     at(15, 30),
+			want:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.group.TokenQuotaUsageAt(tt.tokens, tt.at); got != tt.want {
+				t.Fatalf("TokenQuotaUsageAt(%d) = %d, want %d", tt.tokens, got, tt.want)
+			}
+		})
+	}
+}

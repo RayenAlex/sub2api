@@ -191,16 +191,19 @@ func TestCheckSubscriptionEligibility_WeeklyAndMonthlyTokenLimits(t *testing.T) 
 
 // ---- seam 3 续: buildUsageBillingCommand 把 UsageLog token 计入订阅命令 ----
 
-func TestBuildUsageBillingCommand_SubscriptionCarriesTokenCount(t *testing.T) {
+func TestBuildUsageBillingCommand_SubscriptionCarriesPeakAdjustedTokenCount(t *testing.T) {
 	groupID := int64(7)
 	subID := int64(42)
 	p := &postUsageBillingParams{
-		Cost: &CostBreakdown{TotalCost: 1.0, ActualCost: 1.0},
-		User: &User{ID: 1},
-		APIKey: &APIKey{ID: 2, GroupID: &groupID},
-		Account: &Account{ID: 3},
-		Subscription: &UserSubscription{ID: subID},
+		Cost:               &CostBreakdown{TotalCost: 1.0, ActualCost: 3.0},
+		User:               &User{ID: 1},
+		APIKey:             &APIKey{ID: 2, GroupID: &groupID},
+		Account:            &Account{ID: 3},
+		Subscription:       &UserSubscription{ID: subID},
 		IsSubscriptionBill: true,
+		// 高峰 3 倍已在请求时刻计算完成，账单命令必须使用该预处理值，
+		// 不能重新从 usageLog 取原始 22 tokens。
+		BillableTokens: 66,
 	}
 	usageLog := &UsageLog{
 		InputTokens:         11,
@@ -208,21 +211,21 @@ func TestBuildUsageBillingCommand_SubscriptionCarriesTokenCount(t *testing.T) {
 		CacheCreationTokens: 4,
 		CacheReadTokens:     2,
 	}
+
 	cmd := buildUsageBillingCommand("req-1", usageLog, p)
 	require.NotNil(t, cmd)
-	require.Equal(t, int64(22), cmd.SubscriptionTokens,
-		"订阅计费的 token 增量应等于实际 usage 的 input+output+cache_creation+cache_read")
+	require.Equal(t, int64(66), cmd.SubscriptionTokens, "高峰 3 倍时 22 个实际 tokens 应扣除 66 个 token 配额")
 }
 
 func TestBuildUsageBillingCommand_NonSubscriptionLeavesTokenZero(t *testing.T) {
 	groupID := int64(7)
 	subID := int64(42)
 	p := &postUsageBillingParams{
-		Cost: &CostBreakdown{TotalCost: 1.0, ActualCost: 1.0},
-		User: &User{ID: 1},
-		APIKey: &APIKey{ID: 2, GroupID: &groupID},
-		Account: &Account{ID: 3},
-		Subscription: &UserSubscription{ID: subID},
+		Cost:               &CostBreakdown{TotalCost: 1.0, ActualCost: 1.0},
+		User:               &User{ID: 1},
+		APIKey:             &APIKey{ID: 2, GroupID: &groupID},
+		Account:            &Account{ID: 3},
+		Subscription:       &UserSubscription{ID: subID},
 		IsSubscriptionBill: false,
 	}
 	usageLog := &UsageLog{

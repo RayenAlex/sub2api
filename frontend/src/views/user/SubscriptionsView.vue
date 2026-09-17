@@ -219,12 +219,76 @@
               </p>
             </div>
 
+            <!-- Token Quota Usage -->
+            <div v-if="subscription.group?.token_quota?.daily?.enabled" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('userSubscriptions.daily') }}
+                </span>
+                <span class="text-sm text-gray-500 dark:text-dark-400">
+                  {{ (subscription.daily_token_usage || 0).toLocaleString() }} /
+                  {{ subscription.group.token_quota.daily.limit != null
+                    ? subscription.group.token_quota.daily.limit.toLocaleString() + 't'
+                    : '∞' }}
+                </span>
+              </div>
+              <div class="relative h-2 overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/40">
+                <div
+                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
+                  :class="getProgressBarClass(subscription.daily_token_usage, subscription.group.token_quota.daily.limit)"
+                  :style="{ width: getProgressWidth(subscription.daily_token_usage, subscription.group.token_quota.daily.limit) }"
+                ></div>
+              </div>
+            </div>
+            <div v-if="subscription.group?.token_quota?.weekly?.enabled" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('userSubscriptions.weekly') }}
+                </span>
+                <span class="text-sm text-gray-500 dark:text-dark-400">
+                  {{ (subscription.weekly_token_usage || 0).toLocaleString() }} /
+                  {{ subscription.group.token_quota.weekly.limit != null
+                    ? subscription.group.token_quota.weekly.limit.toLocaleString() + 't'
+                    : '∞' }}
+                </span>
+              </div>
+              <div class="relative h-2 overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/40">
+                <div
+                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
+                  :class="getProgressBarClass(subscription.weekly_token_usage, subscription.group.token_quota.weekly.limit)"
+                  :style="{ width: getProgressWidth(subscription.weekly_token_usage, subscription.group.token_quota.weekly.limit) }"
+                ></div>
+              </div>
+            </div>
+            <div v-if="subscription.group?.token_quota?.monthly?.enabled" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('userSubscriptions.monthly') }}
+                </span>
+                <span class="text-sm text-gray-500 dark:text-dark-400">
+                  {{ (subscription.monthly_token_usage || 0).toLocaleString() }} /
+                  {{ subscription.group.token_quota.monthly.limit != null
+                    ? subscription.group.token_quota.monthly.limit.toLocaleString() + 't'
+                    : '∞' }}
+                </span>
+              </div>
+              <div class="relative h-2 overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/40">
+                <div
+                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
+                  :class="getProgressBarClass(subscription.monthly_token_usage, subscription.group.token_quota.monthly.limit)"
+                  :style="{ width: getProgressWidth(subscription.monthly_token_usage, subscription.group.token_quota.monthly.limit) }"
+                ></div>
+              </div>
+            </div>
             <!-- No limits configured - Unlimited badge -->
             <div
               v-if="
                 !subscription.group?.daily_limit_usd &&
                 !subscription.group?.weekly_limit_usd &&
-                !subscription.group?.monthly_limit_usd
+                !subscription.group?.monthly_limit_usd &&
+                !subscription.group?.token_quota?.daily?.enabled &&
+                !subscription.group?.token_quota?.weekly?.enabled &&
+                !subscription.group?.token_quota?.monthly?.enabled
               "
               class="flex items-center justify-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 py-6 dark:from-emerald-900/20 dark:to-teal-900/20"
             >

@@ -34,14 +34,14 @@ type Group struct {
 	// an already committed one-click copy. It must never be mapped to API DTOs.
 	DuplicateOperationID string
 
-	SubscriptionType    string
-	DailyLimitUSD       *float64
-	WeeklyLimitUSD      *float64
-	MonthlyLimitUSD     *float64
+	SubscriptionType string
+	DailyLimitUSD    *float64
+	WeeklyLimitUSD   *float64
+	MonthlyLimitUSD  *float64
 	// Token 配额（token 数量；nil=不限，0=禁止消耗 token 的硬上限）
-	DailyTokenLimit   *int64
-	WeeklyTokenLimit  *int64
-	MonthlyTokenLimit *int64
+	DailyTokenLimit     *int64
+	WeeklyTokenLimit    *int64
+	MonthlyTokenLimit   *int64
 	DefaultValidityDays int
 
 	// 图片生成计费配置（antigravity 和 gemini 平台使用）
@@ -344,6 +344,33 @@ func (g *Group) PeakMultiplierAt(now time.Time) float64 {
 		return g.PeakRateMultiplier
 	}
 	return 1.0
+}
+
+// TokenQuotaUsageAt returns the token quota consumption for a request at now.
+// High-peak subscriptions consume token quota at the same multiplier as text billing.
+// Token quota storage is integral, so fractional multipliers are rounded up to avoid
+// granting more quota than the configured price multiplier permits.
+func (g *Group) TokenQuotaUsageAt(tokens int64, now time.Time) int64 {
+	if tokens <= 0 {
+		return 0
+	}
+
+	multiplier := g.PeakMultiplierAt(now)
+	if multiplier == 1 {
+		return tokens
+	}
+	if multiplier <= 0 || math.IsNaN(multiplier) {
+		return 0
+	}
+	if math.IsInf(multiplier, 0) {
+		return math.MaxInt64
+	}
+
+	scaled := math.Ceil(float64(tokens) * multiplier)
+	if scaled >= float64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(scaled)
 }
 
 // ValidatePeakRateConfig 是高峰倍率配置的唯一校验来源，供 handler 与 service 层共用。

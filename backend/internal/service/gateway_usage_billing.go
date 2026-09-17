@@ -82,7 +82,7 @@ type postUsageBillingParams struct {
 	AccountRateMultiplier float64
 	APIKeyService         APIKeyQuotaUpdater
 	Platform              string
-	// BillableTokens 本次请求实际消耗的 token 数（由调用方在构建 params 时计算）
+	// BillableTokens 是本次请求计入订阅 token 配额的数量；高峰时已应用 PeakRateMultiplier。
 	BillableTokens int64
 }
 
@@ -315,9 +315,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
-		if usageLog != nil {
-			cmd.SubscriptionTokens = usageLog.BillableTokens()
-		}
+		cmd.SubscriptionTokens = p.BillableTokens
 	} else if p.Cost.ActualCost > 0 {
 		cmd.BalanceCost = p.Cost.ActualCost
 	}
@@ -866,7 +864,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		Subscription:          subscription,
 		RequestPayloadHash:    resolveUsageBillingPayloadFingerprint(ctx, input.RequestPayloadHash),
 		IsSubscriptionBill:    isSubscriptionBilling,
-		BillableTokens:        usageLog.BillableTokens(),
+		BillableTokens:        apiKey.Group.TokenQuotaUsageAt(usageLog.BillableTokens(), pricingAt),
 		AccountRateMultiplier: accountRateMultiplier,
 		APIKeyService:         input.APIKeyService,
 		Platform:              quotaPlatform,
