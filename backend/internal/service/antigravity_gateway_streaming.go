@@ -248,7 +248,7 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 			if strings.HasPrefix(trimmed, "data:") {
 				payload := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
 				if payload == "" || payload == "[DONE]" {
-					cw.Fprintf("%s\n", line)
+					cw.Fprintf("data: %s\n\n", payload)
 					continue
 				}
 

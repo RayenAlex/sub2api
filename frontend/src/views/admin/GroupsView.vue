@@ -6382,7 +6382,8 @@ const handleUpdateGroup = async () => {
   // 模型白名单：开启且没有任何条目时阻止提交，与后端 400 对齐。
   if (
     editModelAllowlistState.enabled &&
-    editModelAllowlistSelectedCount.value === 0
+    editModelAllowlistSelectedCount.value === 0 &&
+    editModelAllowlistState.savedModels.length === 0
   ) {
     appStore.showError(t("admin.groups.modelAllowlist.emptySelectionError"));
     return;

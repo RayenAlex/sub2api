@@ -487,7 +487,7 @@ func (r *userSubscriptionRepository) IncrementUsage(ctx context.Context, id int6
 	`
 
 	client := clientFromContext(ctx, r.client)
-	result, err := client.ExecContext(ctx, updateSQL, costUSD, id)
+	result, err := client.ExecContext(ctx, updateSQL, costUSD, id, tokens)
 	if err != nil {
 		return err
 	}

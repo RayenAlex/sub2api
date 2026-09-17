@@ -47,7 +47,6 @@ export const PROVIDERS: readonly Provider[] = [
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
   PROVIDER_MINIMAX,
-  PROVIDER_OPENCODE_GO,
 ]
 
 /** 仅支持配额模式（无探活 adapter）的 provider。 */
