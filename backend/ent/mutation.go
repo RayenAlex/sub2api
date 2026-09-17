@@ -44888,6 +44888,8 @@ type UsageLogMutation struct {
 	addactual_cost               *float64
 	rate_multiplier              *float64
 	addrate_multiplier           *float64
+	applied_peak_multiplier      *float64
+	addapplied_peak_multiplier   *float64
 	long_context_billing_applied *bool
 	account_rate_multiplier      *float64
 	addaccount_rate_multiplier   *float64
@@ -46447,6 +46449,76 @@ func (m *UsageLogMutation) ResetRateMultiplier() {
 	m.addrate_multiplier = nil
 }
 
+// SetAppliedPeakMultiplier sets the "applied_peak_multiplier" field.
+func (m *UsageLogMutation) SetAppliedPeakMultiplier(f float64) {
+	m.applied_peak_multiplier = &f
+	m.addapplied_peak_multiplier = nil
+}
+
+// AppliedPeakMultiplier returns the value of the "applied_peak_multiplier" field in the mutation.
+func (m *UsageLogMutation) AppliedPeakMultiplier() (r float64, exists bool) {
+	v := m.applied_peak_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAppliedPeakMultiplier returns the old "applied_peak_multiplier" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldAppliedPeakMultiplier(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAppliedPeakMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAppliedPeakMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAppliedPeakMultiplier: %w", err)
+	}
+	return oldValue.AppliedPeakMultiplier, nil
+}
+
+// AddAppliedPeakMultiplier adds f to the "applied_peak_multiplier" field.
+func (m *UsageLogMutation) AddAppliedPeakMultiplier(f float64) {
+	if m.addapplied_peak_multiplier != nil {
+		*m.addapplied_peak_multiplier += f
+	} else {
+		m.addapplied_peak_multiplier = &f
+	}
+}
+
+// AddedAppliedPeakMultiplier returns the value that was added to the "applied_peak_multiplier" field in this mutation.
+func (m *UsageLogMutation) AddedAppliedPeakMultiplier() (r float64, exists bool) {
+	v := m.addapplied_peak_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAppliedPeakMultiplier clears the value of the "applied_peak_multiplier" field.
+func (m *UsageLogMutation) ClearAppliedPeakMultiplier() {
+	m.applied_peak_multiplier = nil
+	m.addapplied_peak_multiplier = nil
+	m.clearedFields[usagelog.FieldAppliedPeakMultiplier] = struct{}{}
+}
+
+// AppliedPeakMultiplierCleared returns if the "applied_peak_multiplier" field was cleared in this mutation.
+func (m *UsageLogMutation) AppliedPeakMultiplierCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldAppliedPeakMultiplier]
+	return ok
+}
+
+// ResetAppliedPeakMultiplier resets all changes to the "applied_peak_multiplier" field.
+func (m *UsageLogMutation) ResetAppliedPeakMultiplier() {
+	m.applied_peak_multiplier = nil
+	m.addapplied_peak_multiplier = nil
+	delete(m.clearedFields, usagelog.FieldAppliedPeakMultiplier)
+}
+
 // SetLongContextBillingApplied sets the "long_context_billing_applied" field.
 func (m *UsageLogMutation) SetLongContextBillingApplied(b bool) {
 	m.long_context_billing_applied = &b
@@ -47600,7 +47672,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 47)
+	fields := make([]string, 0, 48)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -47684,6 +47756,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, usagelog.FieldRateMultiplier)
+	}
+	if m.applied_peak_multiplier != nil {
+		fields = append(fields, usagelog.FieldAppliedPeakMultiplier)
 	}
 	if m.long_context_billing_applied != nil {
 		fields = append(fields, usagelog.FieldLongContextBillingApplied)
@@ -47806,6 +47881,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ActualCost()
 	case usagelog.FieldRateMultiplier:
 		return m.RateMultiplier()
+	case usagelog.FieldAppliedPeakMultiplier:
+		return m.AppliedPeakMultiplier()
 	case usagelog.FieldLongContextBillingApplied:
 		return m.LongContextBillingApplied()
 	case usagelog.FieldAccountRateMultiplier:
@@ -47909,6 +47986,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldActualCost(ctx)
 	case usagelog.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
+	case usagelog.FieldAppliedPeakMultiplier:
+		return m.OldAppliedPeakMultiplier(ctx)
 	case usagelog.FieldLongContextBillingApplied:
 		return m.OldLongContextBillingApplied(ctx)
 	case usagelog.FieldAccountRateMultiplier:
@@ -48152,6 +48231,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRateMultiplier(v)
 		return nil
+	case usagelog.FieldAppliedPeakMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAppliedPeakMultiplier(v)
+		return nil
 	case usagelog.FieldLongContextBillingApplied:
 		v, ok := value.(bool)
 		if !ok {
@@ -48335,6 +48421,9 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addrate_multiplier != nil {
 		fields = append(fields, usagelog.FieldRateMultiplier)
 	}
+	if m.addapplied_peak_multiplier != nil {
+		fields = append(fields, usagelog.FieldAppliedPeakMultiplier)
+	}
 	if m.addaccount_rate_multiplier != nil {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
 	}
@@ -48392,6 +48481,8 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedActualCost()
 	case usagelog.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
+	case usagelog.FieldAppliedPeakMultiplier:
+		return m.AddedAppliedPeakMultiplier()
 	case usagelog.FieldAccountRateMultiplier:
 		return m.AddedAccountRateMultiplier()
 	case usagelog.FieldBillingType:
@@ -48513,6 +48604,13 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddRateMultiplier(v)
 		return nil
+	case usagelog.FieldAppliedPeakMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAppliedPeakMultiplier(v)
+		return nil
 	case usagelog.FieldAccountRateMultiplier:
 		v, ok := value.(float64)
 		if !ok {
@@ -48600,6 +48698,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldSubscriptionID) {
 		fields = append(fields, usagelog.FieldSubscriptionID)
 	}
+	if m.FieldCleared(usagelog.FieldAppliedPeakMultiplier) {
+		fields = append(fields, usagelog.FieldAppliedPeakMultiplier)
+	}
 	if m.FieldCleared(usagelog.FieldAccountRateMultiplier) {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
 	}
@@ -48679,6 +48780,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldSubscriptionID:
 		m.ClearSubscriptionID()
+		return nil
+	case usagelog.FieldAppliedPeakMultiplier:
+		m.ClearAppliedPeakMultiplier()
 		return nil
 	case usagelog.FieldAccountRateMultiplier:
 		m.ClearAccountRateMultiplier()
@@ -48807,6 +48911,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldRateMultiplier:
 		m.ResetRateMultiplier()
+		return nil
+	case usagelog.FieldAppliedPeakMultiplier:
+		m.ResetAppliedPeakMultiplier()
 		return nil
 	case usagelog.FieldLongContextBillingApplied:
 		m.ResetLongContextBillingApplied()

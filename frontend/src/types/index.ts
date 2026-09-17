@@ -1729,6 +1729,8 @@ export interface UsageLog {
   total_cost: number
   actual_cost: number
   rate_multiplier: number
+  // Peak multiplier applied to token billing; null/undefined means no peak snapshot is available.
+  applied_peak_multiplier?: number | null
   long_context_billing_applied: boolean
   billing_type: number
 

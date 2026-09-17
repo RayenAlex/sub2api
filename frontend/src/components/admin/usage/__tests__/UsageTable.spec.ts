@@ -14,7 +14,6 @@ vi.mock('@/stores/app', () => ({ useAppStore: () => appStoreMocks }))
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
 
 import UsageTable from '../UsageTable.vue'
 
@@ -181,19 +180,82 @@ describe('admin UsageTable tooltip', () => {
     expect(rates[1].text()).toBe('-')
   })
 
-  it('marks only usage rows that actually applied long-context billing', () => {
+  it('renders long-context multiplier in context usage without a cost hover trigger', () => {
+    const DataTableStubWithUsageCells = {
+      props: ['data'],
+      template: `
+        <div>
+          <div v-for="row in data" :key="row.request_id">
+            <div data-testid="tokens-cell"><slot name="cell-tokens" :row="row" /></div>
+            <div data-testid="cost-cell"><slot name="cell-cost" :row="row" /></div>
+          </div>
+        </div>
+      `,
+    }
+
     const wrapper = mount(UsageTable, {
       props: {
         data: [
           {
             ...baseImageRow,
             request_id: 'req-long-context-enabled',
+            billing_mode: 'token',
+            input_tokens: 1_969,
+            output_tokens: 622,
+            cache_read_tokens: 321_900,
             long_context_billing_applied: true,
           },
           {
             ...baseImageRow,
             request_id: 'req-long-context-disabled',
+            billing_mode: 'token',
+            input_tokens: 1_969,
+            output_tokens: 622,
+            cache_read_tokens: 321_900,
             long_context_billing_applied: false,
+          },
+        ],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStubWithUsageCells,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const tokenCells = wrapper.findAll('[data-testid="tokens-cell"]')
+    const costCells = wrapper.findAll('[data-testid="cost-cell"]')
+
+    expect(tokenCells[0].get('[data-testid="long-context-billing-marker"]').text()).toBe('x2')
+    expect(tokenCells[1].find('[data-testid="long-context-billing-marker"]').exists()).toBe(false)
+    expect(costCells.every((cell) => !cell.find('[data-testid="long-context-billing-marker"]').exists())).toBe(true)
+    expect(costCells.every((cell) => !cell.find('.group.relative').exists())).toBe(true)
+  })
+
+  it('marks only token rows charged with a peak multiplier', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [
+          {
+            ...baseImageRow,
+            request_id: 'req-peak-token',
+            billing_mode: 'token',
+            input_tokens: 855,
+            output_tokens: 104,
+            applied_peak_multiplier: 3,
+          },
+          {
+            ...baseImageRow,
+            request_id: 'req-normal-token',
+            billing_mode: 'token',
+            input_tokens: 855,
+            output_tokens: 104,
+            applied_peak_multiplier: 1,
           },
         ],
         loading: false,
@@ -209,11 +271,12 @@ describe('admin UsageTable tooltip', () => {
       },
     })
 
-    expect(wrapper.findAll('[data-testid="long-context-billing-marker"]')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="long-context-billing-marker"]').text()).toBe('x2')
+    const markers = wrapper.findAll('[data-testid="peak-token-quota-marker"]')
+    expect(markers).toHaveLength(1)
+    expect(markers[0].text()).toBe('×3')
   })
 
-  it('keeps the request type badge and adds a separate badge only for native compaction rows', () => {
+it('keeps the request type badge and adds a separate badge only for native compaction rows', () => {
     const DataTableStreamStub = {
       props: ['data'],
       template: `
@@ -261,103 +324,6 @@ describe('admin UsageTable tooltip', () => {
     expect(requestBadges[1].text()).toBe('Sync')
     expect(wrapper.findAll('[data-testid="native-compaction-badge"]')).toHaveLength(1)
     expect(wrapper.get('[data-testid="native-compaction-badge"]').text()).toBe('Compaction')
-  })
-
-  it('shows service tier and billing breakdown in cost tooltip', async () => {
-    const row = {
-      request_id: 'req-admin-1',
-      actual_cost: 0.092883,
-      total_cost: 0.092883,
-      account_rate_multiplier: 1,
-      rate_multiplier: 1,
-      service_tier: 'priority',
-      input_cost: 0.020285,
-      output_cost: 0.00303,
-      cache_creation_cost: 0,
-      cache_read_cost: 0.069568,
-      input_tokens: 4057,
-      output_tokens: 101,
-    }
-
-    const wrapper = mount(UsageTable, {
-      props: {
-        data: [row],
-        loading: false,
-        columns: [],
-      },
-      global: {
-        stubs: {
-          DataTable: DataTableStub,
-          EmptyState: true,
-          Icon: true,
-          Teleport: true,
-        },
-      },
-    })
-
-    const tooltipTriggers = wrapper.findAll('.group.relative')
-    await tooltipTriggers[tooltipTriggers.length - 1].trigger('mouseenter')
-    await nextTick()
-
-    const text = wrapper.text()
-    expect(text).toContain('Service tier')
-    expect(text).toContain('Fast')
-    expect(text).toContain('Rate')
-    expect(text).toContain('1.00x')
-    expect(text).toContain('Account rate')
-    expect(text).toContain('User billed')
-    expect(text).toContain('Account billed')
-    expect(text).toContain('$0.092883')
-    expect(text).toContain('$5.0000 / 1M tokens')
-    expect(text).toContain('$30.0000 / 1M tokens')
-    expect(text).toContain('$0.069568')
-  })
-
-  it.each(['token', 'image', 'per_request'])('keeps eight decimal places in %s cost details', async (billingMode) => {
-    const row = {
-      ...baseImageRow,
-      billing_mode: billingMode,
-      image_count: billingMode === 'image' ? 2 : 0,
-      input_cost: 0.00000001,
-      image_input_cost: 0.00000002,
-      output_cost: 0.00000003,
-      image_output_cost: 0.00000004,
-      cache_creation_cost: 0.00000005,
-      cache_read_cost: 0.00000006,
-      total_cost: 0.00000022,
-      actual_cost: 0.00000042,
-      account_stats_cost: 0.00000012,
-      account_rate_multiplier: 1.5,
-    }
-    const wrapper = mount(UsageTable, {
-      props: { data: [row], loading: false, columns: [] },
-      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
-    })
-    const triggers = wrapper.findAll('.group.relative')
-    await triggers[triggers.length - 1].trigger('mouseenter')
-    const amounts = wrapper.get('.fixed').findAll('span').map(span => span.text())
-    expect(amounts).toEqual(expect.arrayContaining([
-      '$0.00000001', '$0.00000002', '$0.00000003', '$0.00000004',
-      '$0.00000005', '$0.00000006', '$0.00000022', '$0.00000042', '$0.00000018',
-    ]))
-    if (billingMode === 'image') expect(amounts).toContain('$0.00000011')
-    wrapper.unmount()
-  })
-
-  it('uses eight decimal places for missing cost values', async () => {
-    const wrapper = mount(UsageTable, {
-      props: {
-        data: [{ ...baseImageRow, billing_mode: 'per_request', image_count: 0, total_cost: undefined, actual_cost: undefined }],
-        loading: false,
-        columns: [],
-      },
-      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
-    })
-    const triggers = wrapper.findAll('.group.relative')
-    await triggers[triggers.length - 1].trigger('mouseenter')
-    const amounts = wrapper.get('.fixed').findAll('span').map(span => span.text()).filter(text => text.startsWith('$'))
-    expect(amounts).toEqual(['$0.00000000', '$0.00000000', '$0.00000000', '$0.00000000'])
-    wrapper.unmount()
   })
 
   it('shows requested and upstream models separately for admin rows', () => {
@@ -520,90 +486,7 @@ describe('admin UsageTable tooltip', () => {
 		expect(text).toContain(expectedBadge)
 	})
 
-  it.each([
-    {
-      name: 'defaulted row',
-      row: {
-        ...baseImageRow,
-        request_id: 'req-admin-default-image',
-        image_size: '2K',
-        image_input_size: 'auto',
-        image_output_size: null,
-        image_size_source: 'default',
-      },
-      expected: ['2K', 'Default billing tier', 'auto', 'unknown'],
-    },
-    {
-      name: 'output-sourced row',
-      row: {
-        ...baseImageRow,
-        request_id: 'req-admin-output-image',
-        image_size: '4K',
-        image_input_size: '1024x1024',
-        image_output_size: '3840x2160',
-        image_size_source: 'output',
-        image_size_breakdown: { '4K': 1 },
-      },
-      expected: ['4K', 'Upstream output', '1024x1024', '3840x2160', '4K x 1'],
-    },
-    {
-      name: 'input-sourced row',
-      row: {
-        ...baseImageRow,
-        request_id: 'req-admin-input-image',
-        image_size: '1K',
-        image_input_size: '1024x1024',
-        image_output_size: null,
-        image_size_source: 'input',
-      },
-      expected: ['1K', 'Request input', '1024x1024', 'unknown'],
-    },
-    {
-      name: 'legacy unstandardized row',
-      row: {
-        ...baseImageRow,
-        request_id: 'req-admin-legacy-unstandardized-image',
-        image_size: '512x512',
-        image_input_size: null,
-        image_output_size: null,
-        image_size_source: null,
-      },
-      expected: ['legacy unstandardized: 512x512', 'Legacy record', 'unknown'],
-    },
-  ])('shows image usage metadata for $name', async ({ row, expected }) => {
-    const wrapper = mount(UsageTable, {
-      props: {
-        data: [row],
-        loading: false,
-        columns: [],
-      },
-      global: {
-        stubs: {
-          DataTable: DataTableStub,
-          EmptyState: true,
-          Icon: true,
-          Teleport: true,
-        },
-      },
-    })
-
-    await wrapper.find('.group.relative').trigger('mouseenter')
-    await nextTick()
-
-    const text = wrapper.text()
-    expect(text).toContain('Image count')
-    expect(text).toContain('Billing size')
-    expect(text).toContain('Size source')
-    expect(text).toContain('Input size')
-    expect(text).toContain('Output size')
-    expect(text).toContain('Per-image price')
-    expect(text).toContain('Image total price')
-    for (const value of expected) {
-      expect(text).toContain(value)
-    }
-  })
-
-  it('displays historical image rows with missing billing_mode as image usage without a 2K fallback', async () => {
+  it('displays historical image rows with missing billing_mode as image usage without a 2K fallback', () => {
     const wrapper = mount(UsageTable, {
       props: {
         data: [
@@ -631,13 +514,8 @@ describe('admin UsageTable tooltip', () => {
       },
     })
 
-    await wrapper.find('.group.relative').trigger('mouseenter')
-    await nextTick()
-
     const text = wrapper.text()
-    expect(text).toContain('Image')
-    expect(text).toContain('Image count')
-    expect(text).toContain('Per-image price')
+    expect(text).toContain('2 images')
     expect(text).toContain('not recorded')
     expect(text).not.toContain('(2K)')
   })

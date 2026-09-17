@@ -483,6 +483,8 @@ func TestOpenAIGatewayServiceRecordUsage_PeakRateAffectsTokenModeImageOutputToke
 	require.NoError(t, err)
 	require.NotNil(t, usageRepo.lastLog)
 	require.Equal(t, 3.0, usageRepo.lastLog.RateMultiplier)
+	require.NotNil(t, usageRepo.lastLog.AppliedPeakMultiplier)
+	require.Equal(t, 3.0, *usageRepo.lastLog.AppliedPeakMultiplier)
 	require.Equal(t, usage.ImageOutputTokens, usageRepo.lastLog.ImageOutputTokens)
 
 	expected, err := svc.billingService.CalculateCostUnified(CostInput{

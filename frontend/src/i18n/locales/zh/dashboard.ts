@@ -331,6 +331,7 @@ export default {
     description: '查看和分析您的 API 使用历史',
     costDetails: '费用明细',
     tokenDetails: 'Token 明细',
+    peakTokenQuotaMultiplier: '高峰期 Token 配额按 ×{multiplier} 扣减',
     cacheHitRate: '缓存命中率',
     cacheHitRateHint: '缓存读取 Token ÷（非缓存输入 Token + 缓存写入 Token + 缓存读取 Token）。没有可计量的提示词 Token 时显示 -。',
     cacheTtlOverriddenHint: '缓存 TTL Override 已启用',

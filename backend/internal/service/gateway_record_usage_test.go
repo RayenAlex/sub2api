@@ -369,6 +369,8 @@ func TestGatewayServiceRecordUsage_PeakRateAffectsTokenModeImageOutputTokens(t *
 	require.NotNil(t, usageRepo.lastLog.BillingMode)
 	require.Equal(t, string(BillingModeToken), *usageRepo.lastLog.BillingMode)
 	require.Equal(t, 3.0, usageRepo.lastLog.RateMultiplier)
+	require.NotNil(t, usageRepo.lastLog.AppliedPeakMultiplier)
+	require.Equal(t, 3.0, *usageRepo.lastLog.AppliedPeakMultiplier)
 
 	textInput := 1000 * 3e-6
 	textOutput := 500 * 15e-6

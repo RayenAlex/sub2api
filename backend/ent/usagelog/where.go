@@ -195,6 +195,11 @@ func RateMultiplier(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldRateMultiplier, v))
 }
 
+// AppliedPeakMultiplier applies equality check predicate on the "applied_peak_multiplier" field. It's identical to AppliedPeakMultiplierEQ.
+func AppliedPeakMultiplier(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAppliedPeakMultiplier, v))
+}
+
 // LongContextBillingApplied applies equality check predicate on the "long_context_billing_applied" field. It's identical to LongContextBillingAppliedEQ.
 func LongContextBillingApplied(v bool) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldLongContextBillingApplied, v))
@@ -1573,6 +1578,56 @@ func RateMultiplierLT(v float64) predicate.UsageLog {
 // RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
 func RateMultiplierLTE(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// AppliedPeakMultiplierEQ applies the EQ predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierNEQ applies the NEQ predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierIn applies the In predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldAppliedPeakMultiplier, vs...))
+}
+
+// AppliedPeakMultiplierNotIn applies the NotIn predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldAppliedPeakMultiplier, vs...))
+}
+
+// AppliedPeakMultiplierGT applies the GT predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierGTE applies the GTE predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierLT applies the LT predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierLTE applies the LTE predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldAppliedPeakMultiplier, v))
+}
+
+// AppliedPeakMultiplierIsNil applies the IsNil predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldAppliedPeakMultiplier))
+}
+
+// AppliedPeakMultiplierNotNil applies the NotNil predicate on the "applied_peak_multiplier" field.
+func AppliedPeakMultiplierNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldAppliedPeakMultiplier))
 }
 
 // LongContextBillingAppliedEQ applies the EQ predicate on the "long_context_billing_applied" field.

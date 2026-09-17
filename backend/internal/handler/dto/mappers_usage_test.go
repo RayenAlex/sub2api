@@ -106,6 +106,7 @@ func TestUsageLogFromService_IncludesServiceTierForUserAndAdmin(t *testing.T) {
 		ServiceTier:           &serviceTier,
 		InboundEndpoint:       &inboundEndpoint,
 		UpstreamEndpoint:      &upstreamEndpoint,
+		AppliedPeakMultiplier: f64Ptr(3),
 		AccountRateMultiplier: f64Ptr(1.5),
 	}
 
@@ -123,6 +124,10 @@ func TestUsageLogFromService_IncludesServiceTierForUserAndAdmin(t *testing.T) {
 	require.Equal(t, inboundEndpoint, *adminDTO.InboundEndpoint)
 	require.NotNil(t, adminDTO.UpstreamEndpoint)
 	require.Equal(t, upstreamEndpoint, *adminDTO.UpstreamEndpoint)
+	require.NotNil(t, userDTO.AppliedPeakMultiplier)
+	require.InDelta(t, 3, *userDTO.AppliedPeakMultiplier, 1e-12)
+	require.NotNil(t, adminDTO.AppliedPeakMultiplier)
+	require.InDelta(t, 3, *adminDTO.AppliedPeakMultiplier, 1e-12)
 	require.NotNil(t, adminDTO.AccountRateMultiplier)
 	require.InDelta(t, 1.5, *adminDTO.AccountRateMultiplier, 1e-12)
 }

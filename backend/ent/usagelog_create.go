@@ -379,6 +379,20 @@ func (_c *UsageLogCreate) SetNillableRateMultiplier(v *float64) *UsageLogCreate 
 	return _c
 }
 
+// SetAppliedPeakMultiplier sets the "applied_peak_multiplier" field.
+func (_c *UsageLogCreate) SetAppliedPeakMultiplier(v float64) *UsageLogCreate {
+	_c.mutation.SetAppliedPeakMultiplier(v)
+	return _c
+}
+
+// SetNillableAppliedPeakMultiplier sets the "applied_peak_multiplier" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableAppliedPeakMultiplier(v *float64) *UsageLogCreate {
+	if v != nil {
+		_c.SetAppliedPeakMultiplier(*v)
+	}
+	return _c
+}
+
 // SetLongContextBillingApplied sets the "long_context_billing_applied" field.
 func (_c *UsageLogCreate) SetLongContextBillingApplied(v bool) *UsageLogCreate {
 	_c.mutation.SetLongContextBillingApplied(v)
@@ -1058,6 +1072,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
+	}
+	if value, ok := _c.mutation.AppliedPeakMultiplier(); ok {
+		_spec.SetField(usagelog.FieldAppliedPeakMultiplier, field.TypeFloat64, value)
+		_node.AppliedPeakMultiplier = &value
 	}
 	if value, ok := _c.mutation.LongContextBillingApplied(); ok {
 		_spec.SetField(usagelog.FieldLongContextBillingApplied, field.TypeBool, value)
@@ -1749,6 +1767,30 @@ func (u *UsageLogUpsert) UpdateRateMultiplier() *UsageLogUpsert {
 // AddRateMultiplier adds v to the "rate_multiplier" field.
 func (u *UsageLogUpsert) AddRateMultiplier(v float64) *UsageLogUpsert {
 	u.Add(usagelog.FieldRateMultiplier, v)
+	return u
+}
+
+// SetAppliedPeakMultiplier sets the "applied_peak_multiplier" field.
+func (u *UsageLogUpsert) SetAppliedPeakMultiplier(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldAppliedPeakMultiplier, v)
+	return u
+}
+
+// UpdateAppliedPeakMultiplier sets the "applied_peak_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateAppliedPeakMultiplier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldAppliedPeakMultiplier)
+	return u
+}
+
+// AddAppliedPeakMultiplier adds v to the "applied_peak_multiplier" field.
+func (u *UsageLogUpsert) AddAppliedPeakMultiplier(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldAppliedPeakMultiplier, v)
+	return u
+}
+
+// ClearAppliedPeakMultiplier clears the value of the "applied_peak_multiplier" field.
+func (u *UsageLogUpsert) ClearAppliedPeakMultiplier() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldAppliedPeakMultiplier)
 	return u
 }
 
@@ -2684,6 +2726,34 @@ func (u *UsageLogUpsertOne) AddRateMultiplier(v float64) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateRateMultiplier() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetAppliedPeakMultiplier sets the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertOne) SetAppliedPeakMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAppliedPeakMultiplier(v)
+	})
+}
+
+// AddAppliedPeakMultiplier adds v to the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertOne) AddAppliedPeakMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAppliedPeakMultiplier(v)
+	})
+}
+
+// UpdateAppliedPeakMultiplier sets the "applied_peak_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateAppliedPeakMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAppliedPeakMultiplier()
+	})
+}
+
+// ClearAppliedPeakMultiplier clears the value of the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertOne) ClearAppliedPeakMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAppliedPeakMultiplier()
 	})
 }
 
@@ -3840,6 +3910,34 @@ func (u *UsageLogUpsertBulk) AddRateMultiplier(v float64) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateRateMultiplier() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetAppliedPeakMultiplier sets the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertBulk) SetAppliedPeakMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAppliedPeakMultiplier(v)
+	})
+}
+
+// AddAppliedPeakMultiplier adds v to the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertBulk) AddAppliedPeakMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAppliedPeakMultiplier(v)
+	})
+}
+
+// UpdateAppliedPeakMultiplier sets the "applied_peak_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateAppliedPeakMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAppliedPeakMultiplier()
+	})
+}
+
+// ClearAppliedPeakMultiplier clears the value of the "applied_peak_multiplier" field.
+func (u *UsageLogUpsertBulk) ClearAppliedPeakMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAppliedPeakMultiplier()
 	})
 }
 

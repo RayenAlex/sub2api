@@ -326,6 +326,7 @@ export default {
     description: 'View and analyze your API usage history',
     costDetails: 'Cost Breakdown',
     tokenDetails: 'Token Breakdown',
+    peakTokenQuotaMultiplier: 'Peak token quota charged at ×{multiplier}',
     cacheHitRate: 'Cache Hit Rate',
     cacheHitRateHint: 'Cache-read tokens ÷ (uncached input tokens + cache-creation tokens + cache-read tokens). Shows - when the request has no measurable prompt tokens.',
     cacheTtlOverriddenHint: 'Cache TTL Override enabled',
