@@ -116,6 +116,7 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const usageTableStub = { props: ['columns'], template: '<div />' }
 
 const usageLog = {
   id: 1,
@@ -159,7 +160,7 @@ function mountUsageView() {
         DateRangePicker: true,
         Icon: true,
         UsageStatsCards: chartStub,
-        UsageTable: chartStub,
+        UsageTable: usageTableStub,
         UserErrorRequestsTable: chartStub,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
@@ -529,6 +530,16 @@ describe('user UsageView', () => {
     vi.unstubAllGlobals()
     clickSpy.mockRestore()
   })
+
+  it('includes cache hit rate in user usage columns', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columnKeys = (wrapper.findComponent(UsageTable).props('columns') as Array<{ key: string }>).map((column) => column.key)
+    expect(columnKeys).toContain('cache_hit_rate')
+    expect(columnKeys.indexOf('cache_hit_rate')).toBe(columnKeys.indexOf('tokens') + 1)
+  })
+
 })
 
 describe('UsageView subscription feature flag', () => {
