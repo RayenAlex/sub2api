@@ -167,11 +167,13 @@ type openAIRecordUsageSubRepoStub struct {
 
 	incrementCalls int
 	incrementErr   error
+	lastTokens     int64
 	lastCtxErr     error
 }
 
 func (s *openAIRecordUsageSubRepoStub) IncrementUsage(ctx context.Context, id int64, costUSD float64, tokens int64) error {
 	s.incrementCalls++
+	s.lastTokens = tokens
 	s.lastCtxErr = ctx.Err()
 	return s.incrementErr
 }
@@ -2024,6 +2026,7 @@ func TestOpenAIGatewayServiceRecordUsage_SubscriptionBillingSetsSubscriptionFiel
 	require.NotNil(t, usageRepo.lastLog.SubscriptionID)
 	require.Equal(t, subscription.ID, *usageRepo.lastLog.SubscriptionID)
 	require.Equal(t, 1, subRepo.incrementCalls)
+	require.EqualValues(t, 15, subRepo.lastTokens)
 	require.Equal(t, 0, userRepo.deductCalls)
 }
 

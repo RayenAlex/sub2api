@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -316,4 +317,65 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 	require.Len(t, adminSvc.createdProxies, 0)
 	require.Len(t, adminSvc.createdAccounts, 1)
 	require.True(t, adminSvc.createdAccounts[0].SkipDefaultGroupBind)
+}
+
+func TestImportDataStatusOnlyProxyUpdatePreservesOptionalSettings(t *testing.T) {
+	router, adminSvc := setupAccountDataRouter()
+	expiresAt := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+	backupID := int64(2)
+	adminSvc.proxies = []service.Proxy{
+		{
+			ID:             1,
+			Name:           "proxy-a",
+			Protocol:       "http",
+			Host:           "127.0.0.1",
+			Port:           8080,
+			Username:       "user",
+			Password:       "pass",
+			Status:         service.StatusActive,
+			ExpiresAt:      &expiresAt,
+			FallbackMode:   service.FallbackModeProxy,
+			BackupProxyID:  &backupID,
+			ExpiryWarnDays: 7,
+		},
+		{ID: backupID, Name: "proxy-backup", Protocol: "http", Host: "127.0.0.2", Port: 8080},
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"data": map[string]any{
+			"type":    dataType,
+			"version": dataVersion,
+			"proxies": []map[string]any{{
+				"proxy_key": "http|127.0.0.1|8080|user|pass",
+				"name":      "proxy-a",
+				"protocol":  "http",
+				"host":      "127.0.0.1",
+				"port":      8080,
+				"username":  "user",
+				"password":  "pass",
+				"status":    "inactive",
+			}},
+			"accounts": []map[string]any{},
+		},
+	})
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	adminSvc.mu.Lock()
+	require.Len(t, adminSvc.updatedProxies, 1)
+	input := adminSvc.updatedProxies[0]
+	adminSvc.mu.Unlock()
+
+	require.Equal(t, "inactive", input.Status)
+	require.Equal(t, &expiresAt, input.ExpiresAt)
+	require.False(t, input.ClearExpiresAt)
+	require.Equal(t, service.FallbackModeProxy, input.FallbackMode)
+	require.Equal(t, &backupID, input.BackupProxyID)
+	require.False(t, input.ClearBackupID)
+	require.Equal(t, 7, *input.ExpiryWarnDays)
 }
