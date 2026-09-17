@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSubscriptionTokenQuotaMigrationGuardsConstraintReplays(t *testing.T) {
-	content, err := FS.ReadFile("236_add_subscription_token_quotas.sql")
+func TestSubscriptionTokenQuotaConstraintRepairMigrationGuardsReplays(t *testing.T) {
+	content, err := FS.ReadFile("239_ensure_subscription_token_quota_constraints.sql")
 	require.NoError(t, err)
 
 	sql := strings.Join(strings.Fields(string(content)), " ")
