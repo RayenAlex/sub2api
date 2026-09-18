@@ -304,4 +304,28 @@ describe('UsageFilters — native compaction filter', () => {
     expect(filters.native_compaction_v2).toBe(true)
     expect(wrapper.emitted('change')).toBeTruthy()
   })
+
+  it('uses the dense telemetry filter matrix when requested', () => {
+    const wrapper = mount(UsageFilters, {
+      props: {
+        modelValue: {},
+        exporting: false,
+        startDate: '2026-09-17',
+        endDate: '2026-09-18',
+        telemetry: true,
+      },
+      global: {
+        stubs: {
+          Select: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="usage-filter-matrix"]').classes())
+      .toContain('telemetry-filter-matrix')
+    expect(wrapper.get('.telemetry-filter-layout').classes()).toContain('telemetry-filter-layout')
+    expect(wrapper.get('.telemetry-filter-fields').classes()).toContain('telemetry-filter-fields')
+    expect(wrapper.get('.telemetry-filter-actions').classes()).toContain('telemetry-filter-actions')
+  })
+
 })

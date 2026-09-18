@@ -1,11 +1,18 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex items-center justify-between gap-3">
+  <div
+    data-testid="telemetry-distribution-card"
+    :class="telemetry ? 'telemetry-distribution-card telemetry-distribution-card--blue' : 'card p-4'"
+  >
+    <div v-if="telemetry" data-testid="telemetry-distribution-accent" class="telemetry-distribution-accent"></div>
+    <div class="telemetry-distribution-header mb-4 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
         {{ !enableRankingView || activeView === 'model_distribution'
           ? t('admin.dashboard.modelDistribution')
           : t('admin.dashboard.spendingRankingTitle') }}
       </h3>
+      <p v-if="telemetry" data-testid="telemetry-distribution-meta" class="telemetry-matrix-meta">
+      [矩阵 // 01 · 占比与开销]
+      </p>
       <div class="flex flex-wrap items-center justify-end gap-2">
         <div
           v-if="showSourceToggle"
@@ -101,10 +108,15 @@
     </div>
     <div
       v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
-      class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
+      class="telemetry-distribution-body flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
     >
-      <div class="h-48 w-48 shrink-0">
+      <div :class="telemetry ? 'telemetry-donut-shell' : 'h-48 w-48 shrink-0'">
         <Doughnut :data="chartData" :options="doughnutOptions" />
+        <div v-if="telemetry" class="telemetry-donut-center" aria-hidden="true">
+          <strong data-testid="telemetry-donut-total">{{ telemetryAggregate }}</strong>
+          <span>{{ metric === 'actual_cost' ? '实际消费' : '总 Token' }}</span>
+          <small data-testid="telemetry-donut-active">{{ displayModelStats.length }} 个活跃模型</small>
+        </div>
       </div>
       <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
         <table class="w-full text-xs">
@@ -119,7 +131,7 @@
             </tr>
           </thead>
           <tbody>
-            <template v-for="model in displayModelStats" :key="model.model">
+            <template v-for="(model, modelIndex) in displayModelStats" :key="model.model">
               <tr
                 class="border-t border-gray-100 transition-colors dark:border-dark-700"
                 :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
@@ -133,6 +145,7 @@
                   <span class="inline-flex items-center gap-1">
                     <svg v-if="enableBreakdown && expandedKey === `model-${model.model}`" class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     <svg v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span v-if="telemetry" class="telemetry-series-swatch" :style="{ backgroundColor: telemetryChartColors[modelIndex % telemetryChartColors.length] }"></span>
                     {{ model.model }}
                   </span>
                 </td>
@@ -239,6 +252,10 @@
     >
       {{ t('admin.dashboard.noDataAvailable') }}
     </div>
+    <div v-if="telemetry" data-testid="telemetry-distribution-footer" class="telemetry-distribution-footer">
+      <span>筛选条件：{{ source === 'requested' ? '请求模型' : source === 'upstream' ? '上游模型' : '映射模型' }}</span>
+      <strong>指标聚合：活跃</strong>
+    </div>
   </div>
 </template>
 
@@ -280,6 +297,7 @@ const props = withDefaults(defineProps<{
   startDate?: string
   endDate?: string
   filters?: Record<string, any>
+  telemetry?: boolean
 }>(), {
   upstreamModelStats: () => [],
   mappingModelStats: () => [],
@@ -296,7 +314,8 @@ const props = withDefaults(defineProps<{
   enableBreakdown: true,
   showAccountCost: true,
   rankingLoading: false,
-  rankingError: false
+  rankingError: false,
+  telemetry: false
 })
 
 const expandedKey = ref<string | null>(null)
@@ -354,6 +373,8 @@ const chartColors = [
   '#a855f7'
 ]
 
+const telemetryChartColors = ['#1652f0', '#10b981', '#f5a623', '#e53935', '#030304', '#8b5cf6']
+
 const displayModelStats = computed(() => {
   const sourceStats = props.source === 'upstream'
     ? props.upstreamModelStats
@@ -366,6 +387,14 @@ const displayModelStats = computed(() => {
   return [...sourceStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
+const telemetryAggregate = computed(() => {
+  const total = displayModelStats.value.reduce(
+    (sum, item) => sum + toFiniteNumber(props.metric === 'actual_cost' ? item.actual_cost : item.total_tokens),
+    0
+  )
+  return props.metric === 'actual_cost' ? `$${formatCost(total)}` : formatTokens(total)
+})
+
 const chartData = computed(() => {
   if (!displayModelStats.value.length) return null
 
@@ -374,7 +403,7 @@ const chartData = computed(() => {
     datasets: [
       {
         data: displayModelStats.value.map((m) => toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens)),
-        backgroundColor: chartColors.slice(0, displayModelStats.value.length),
+        backgroundColor: (props.telemetry ? telemetryChartColors : chartColors).slice(0, displayModelStats.value.length),
         borderWidth: 0
       }
     ]
@@ -440,6 +469,7 @@ const rankingDisplayItems = computed<RankingDisplayItem[]>(() => {
 const doughnutOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  cutout: props.telemetry ? '68%' : '50%',
   plugins: {
     legend: {
       display: false

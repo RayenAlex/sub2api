@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 import UserTokenRanking from '../UserTokenRanking.vue'
@@ -42,9 +42,37 @@ const mountRanking = (props: Record<string, unknown> = {}) =>
   })
 
 describe('UserTokenRanking', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     getUserBreakdown.mockReset()
     getUserBreakdown.mockResolvedValue({ users: [item(1, 100), item(2, 50)] })
+  })
+
+  it('switches token rankings between daily and weekly calendar windows', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-17T12:00:00'))
+
+    const wrapper = mountRanking()
+    await flushPromises()
+
+    await wrapper.get('[data-testid=token-ranking-period-day]').trigger('click')
+    await flushPromises()
+    expect(getUserBreakdown).toHaveBeenLastCalledWith(expect.objectContaining({
+      start_date: '2026-09-17',
+      end_date: '2026-09-17',
+      sort_by: 'total_tokens'
+    }))
+
+    await wrapper.get('[data-testid=token-ranking-period-week]').trigger('click')
+    await flushPromises()
+    expect(getUserBreakdown).toHaveBeenLastCalledWith(expect.objectContaining({
+      start_date: '2026-09-11',
+      end_date: '2026-09-17',
+      sort_by: 'total_tokens'
+    }))
   })
 
   it('loads on mount with shared filters and emits select-user with id + email on row click', async () => {

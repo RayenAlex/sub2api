@@ -1,22 +1,18 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-950">
-    <!-- Background Decoration -->
-    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
+  <div class="orbital-shell">
+    <div class="orbital-shell__grid" aria-hidden="true"></div>
 
-    <!-- Sidebar -->
+    <AppHeader />
     <AppSidebar />
 
-    <!-- Main Content Area -->
     <div
-      class="relative min-h-screen transition-all duration-300"
-      :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
+      class="orbital-main transition-[margin] duration-300"
+      :class="[sidebarCollapsed ? 'lg:ml-[88px]' : 'lg:ml-[320px]']"
     >
-      <!-- Header -->
-      <AppHeader />
-
-      <!-- Main Content -->
-      <main class="p-4 md:p-6 lg:p-8">
-        <slot />
+      <main class="orbital-main__content">
+        <div class="orbital-workspace">
+          <slot />
+        </div>
       </main>
     </div>
   </div>
@@ -36,12 +32,10 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
-
 const { replayTour } = useOnboardingTour({
   storageKey: isAdmin.value ? 'admin_guide' : 'user_guide',
-  autoStart: true
+  autoStart: true,
 })
-
 const onboardingStore = useOnboardingStore()
 
 onMounted(() => {

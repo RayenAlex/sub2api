@@ -1,10 +1,22 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="telemetry-page space-y-6">
+      <section class="telemetry-page__intro" aria-label="Telemetry overview">
+        <div>
+          <p class="telemetry-page__eyebrow"><span aria-hidden="true"></span> TELEMETRY // USAGE</p>
+          <h2 class="telemetry-page__heading">{{ t('nav.usage') }}</h2>
+          <p class="telemetry-page__description">{{ t('usage.inSelectedRange') }}</p>
+        </div>
+        <div class="telemetry-page__window">
+          <span>WINDOW</span>
+          <strong>{{ startDate }} — {{ endDate }}</strong>
+        </div>
+      </section>
+
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
-        <div class="card p-4">
+        <div class="orbital-panel telemetry-command-bar p-3 sm:p-4">
           <div class="flex flex-wrap items-center gap-4">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
@@ -23,8 +35,9 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6">
           <ModelDistributionChart
+            telemetry
             v-model:metric="modelDistributionMetric"
             :model-stats="requestedModelStats"
             :loading="modelStatsLoading"
@@ -36,6 +49,7 @@
             :end-date="endDate"
           />
           <GroupDistributionChart
+            telemetry
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
@@ -47,8 +61,9 @@
           />
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6">
           <EndpointDistributionChart
+            telemetry
             v-model:source="endpointDistributionSource"
             v-model:metric="endpointDistributionMetric"
             :endpoint-stats="inboundEndpointStats"
@@ -62,160 +77,206 @@
             :start-date="startDate"
             :end-date="endDate"
           />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+          <TokenUsageTrend telemetry :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
 
-      <div class="card p-6">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.errors.keyName') }}</label>
-              <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
+      <section class="orbital-panel telemetry-filter-panel" aria-label="Usage filters">
+        <div class="telemetry-section-heading">
+          <div>
+            <p class="telemetry-section-heading__eyebrow">QUERY // FILTER MATRIX</p>
+            <h3>{{ t('common.filter') }}</h3>
+          </div>
+          <span class="telemetry-section-heading__status"><i aria-hidden="true"></i> READY</span>
+        </div>
+
+        <div class="telemetry-filter-matrix p-4 sm:p-6">
+          <div class="telemetry-filter-layout flex flex-wrap items-end justify-between gap-4">
+            <div v-if="activeTab === 'errors'" class="telemetry-filter-fields flex flex-1 flex-wrap items-end gap-4">
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.errors.keyName') }}</label>
+                <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.errors.model') }}</label>
+                <Select
+                  v-model="errorFilter.model"
+                  :options="errorModelOptions"
+                  searchable
+                  creatable
+                  clearable
+                  :placeholder="t('usage.errors.modelPlaceholder')"
+                  @change="applyErrorFilters"
+                />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('usage.errors.category') }}</label>
+                <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.errors.status') }}</label>
+                <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
+              </div>
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.errors.model') }}</label>
-              <Select
-                v-model="errorFilter.model"
-                :options="errorModelOptions"
-                searchable
-                creatable
-                clearable
-                :placeholder="t('usage.errors.modelPlaceholder')"
-                @change="applyErrorFilters"
-              />
+
+            <div v-else class="telemetry-filter-fields flex flex-1 flex-wrap items-end gap-4">
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
+                <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.model') }}</label>
+                <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.group') }}</label>
+                <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.type') }}</label>
+                <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.compactionFilter') }}</label>
+                <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
+              </div>
+              <div v-if="subscriptionFeatureEnabled" class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.billingType') }}</label>
+                <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
+                <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
+              </div>
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('usage.errors.category') }}</label>
-              <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.errors.status') }}</label>
-              <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
+
+            <div class="telemetry-filter-actions flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+              <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary">
+                {{ t('common.refresh') }}
+              </button>
+              <button type="button" @click="resetFilters" class="btn btn-secondary">
+                {{ t('common.reset') }}
+              </button>
+              <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
+                {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
+              </button>
             </div>
           </div>
-          <div v-else class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
-              <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
+        </div>
+      </section>
+
+      <section class="orbital-panel telemetry-ledger-panel" aria-label="Usage ledger">
+        <header class="telemetry-ledger-header">
+          <div class="telemetry-ledger-primary-tools">
+            <div v-if="errorViewEnabled" class="telemetry-ledger-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'usage'"
+                :class="{ 'is-active': activeTab === 'usage' }"
+                @click="activeTab = 'usage'"
+              >
+                <Icon name="document" size="sm" />
+                <span>{{ t('usage.tabs.usage') }}</span>
+                <strong v-if="activeTab === 'usage'">{{ pagination.total.toLocaleString() }}</strong>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'errors'"
+                :class="{ 'is-active': activeTab === 'errors' }"
+                @click="switchToErrors"
+              >
+                <Icon name="exclamationTriangle" size="sm" />
+                <span>{{ t('usage.tabs.errors') }}</span>
+                <strong v-if="activeTab === 'errors'" class="is-error">{{ errorTotal.toLocaleString() }}</strong>
+              </button>
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.model') }}</label>
-              <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.group') }}</label>
-              <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.type') }}</label>
-              <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.compactionFilter') }}</label>
-              <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
-            </div>
-            <div v-if="subscriptionFeatureEnabled" class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingType') }}</label>
-              <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
-              <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
-            </div>
+            <span class="telemetry-live-state"><i aria-hidden="true"></i>{{ t('usage.liveSync') }}</span>
           </div>
 
-          <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-            <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary">
-              {{ t('common.refresh') }}
-            </button>
-            <button type="button" @click="resetFilters" class="btn btn-secondary">
-              {{ t('common.reset') }}
-            </button>
-            <div class="relative" ref="columnDropdownRef">
+          <div class="telemetry-ledger-tools">
+            <span class="telemetry-record-total">
+              {{ t('usage.telemetryRecordCount', { count: (activeTab === 'errors' ? errorTotal : pagination.total).toLocaleString() }) }}
+            </span>
+            <div ref="columnDropdownRef" class="relative">
               <button
                 type="button"
                 data-testid="usage-column-settings"
-                @click="showColumnDropdown = !showColumnDropdown"
-                class="btn btn-secondary px-2 md:px-3"
+                class="telemetry-column-settings"
                 :title="t('admin.users.columnSettings')"
+                @click="showColumnDropdown = !showColumnDropdown"
               >
                 <Icon name="grid" size="sm" />
-                <span class="hidden md:inline">{{ t('admin.users.columnSettings') }}</span>
+                <span>{{ t('admin.users.columnSettings') }}</span>
               </button>
-              <div
-                v-if="showColumnDropdown"
-                class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
-              >
+              <div v-if="showColumnDropdown" class="telemetry-column-menu">
                 <button
                   v-for="col in currentToggleableColumns"
                   :key="col.key"
                   type="button"
                   :data-testid="`usage-column-toggle-${col.key}`"
                   @click="toggleCurrentColumn(col.key)"
-                  class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
                 >
                   <span>{{ col.label }}</span>
                   <Icon v-if="isCurrentColumnVisible(col.key)" name="check" size="sm" class="text-primary-500" />
                 </button>
               </div>
             </div>
-            <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
-              {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
-            </button>
+          </div>
+        </header>
+
+        <div v-if="activeTab === 'usage'" class="telemetry-ledger-body">
+          <UsageTable
+            flat
+            telemetry
+            :data="usageLogs"
+            :loading="loading"
+            :columns="visibleColumns"
+            :server-side-sort="true"
+            :show-account-billing="false"
+            :show-upstream-endpoint="false"
+            default-sort-key="created_at"
+            default-sort-order="desc"
+            @sort="handleSort"
+            @ipGeoBatchFailed="handleIpGeoBatchFailed"
+          />
+
+          <div v-if="pagination.total > 0" class="telemetry-ledger-pagination">
+            <Pagination
+              :page="pagination.page"
+              :total="pagination.total"
+              :page-size="pagination.page_size"
+              :show-page-size-selector="false"
+              @update:page="handlePageChange"
+              @update:pageSize="handlePageSizeChange"
+            >
+              <template #info="{ from, to, total }">
+                <p class="telemetry-pagination-summary">
+                  {{ t('usage.telemetryPagination', { from, to, total: total.toLocaleString() }) }}
+                </p>
+              </template>
+            </Pagination>
           </div>
         </div>
-      </div>
 
-      <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
-        <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
-          {{ t('usage.tabs.usage') }}
-        </button>
-        <button class="tab" :class="{ 'tab-active': activeTab === 'errors' }" @click="switchToErrors">
-          {{ t('usage.tabs.errors') }}
-        </button>
-      </div>
-
-      <template v-if="activeTab === 'usage'">
-        <UsageTable
-          :data="usageLogs"
-          :loading="loading"
-          :columns="visibleColumns"
-          :server-side-sort="true"
-          :show-account-billing="false"
-          :show-upstream-endpoint="false"
-          default-sort-key="created_at"
-          default-sort-order="desc"
-          @sort="handleSort"
-          @ipGeoBatchFailed="handleIpGeoBatchFailed"
-        />
-
-        <Pagination
-          v-if="pagination.total > 0"
-          :page="pagination.page"
-          :total="pagination.total"
-          :page-size="pagination.page_size"
-          @update:page="handlePageChange"
-          @update:pageSize="handlePageSizeChange"
-        />
-      </template>
-
-      <UserErrorRequestsTable
-        v-else-if="errorViewEnabled"
-        :rows="errorRows"
-        :total="errorTotal"
-        :loading="errorLoading"
-        :page="errorPage"
-        :page-size="errorPageSize"
-        :visible-column-keys="errVisibleColumnKeys"
-        @sort="onErrorSort"
-        @update:page="onErrorPage"
-        @update:pageSize="onErrorPageSize"
-        @ipGeoBatchFailed="handleIpGeoBatchFailed"
-      />
+        <div v-else-if="errorViewEnabled" class="telemetry-ledger-body">
+          <UserErrorRequestsTable
+            :rows="errorRows"
+            :total="errorTotal"
+            :loading="errorLoading"
+            :page="errorPage"
+            :page-size="errorPageSize"
+            :visible-column-keys="errVisibleColumnKeys"
+            @sort="onErrorSort"
+            @update:page="onErrorPage"
+            @update:pageSize="onErrorPageSize"
+            @ipGeoBatchFailed="handleIpGeoBatchFailed"
+          />
+        </div>
+      </section>
     </div>
   </AppLayout>
-
 </template>
 
 <script setup lang="ts">

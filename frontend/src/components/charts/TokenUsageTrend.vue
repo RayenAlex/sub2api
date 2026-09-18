@@ -1,5 +1,59 @@
 <template>
-  <div class="card p-4">
+  <div
+    v-if="telemetry"
+    data-testid="telemetry-trend-card"
+    class="telemetry-trend-card"
+  >
+    <div data-testid="telemetry-trend-accent" class="telemetry-trend-accent" aria-hidden="true"></div>
+
+    <header class="telemetry-trend-header">
+      <div class="telemetry-trend-title-row">
+        <span class="telemetry-trend-title-dot" aria-hidden="true"></span>
+        <h3>{{ t('admin.dashboard.tokenUsageTrend') }}</h3>
+        <span data-testid="telemetry-trend-meta" class="telemetry-trend-meta">
+          [矩阵 // 04 · 实时流量]
+        </span>
+      </div>
+
+      <div data-testid="telemetry-trend-metrics" class="telemetry-trend-metrics">
+        <div
+          v-for="metric in telemetryMetrics"
+          :key="metric.label"
+          data-testid="telemetry-trend-metric"
+          :class="['telemetry-trend-metric', { 'telemetry-trend-metric--rate': metric.rate }]"
+        >
+          <span
+            :class="['telemetry-trend-metric-dot', { 'telemetry-trend-metric-dot--pulse': metric.rate }]"
+            :style="{ backgroundColor: metric.color }"
+            aria-hidden="true"
+          ></span>
+          <span class="telemetry-trend-metric-label">{{ metric.label }}</span>
+          <strong>{{ metric.value }}</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="telemetry-trend-chart-body">
+      <div v-if="loading" class="telemetry-trend-state">
+        <LoadingSpinner />
+      </div>
+      <div v-else-if="trendData.length > 0 && chartData" class="telemetry-trend-canvas">
+        <Line :data="chartData" :options="lineOptions" />
+      </div>
+      <div v-else class="telemetry-trend-state telemetry-trend-empty">
+        {{ t('admin.dashboard.noDataAvailable') }}
+      </div>
+    </div>
+
+    <footer data-testid="telemetry-trend-footer" class="telemetry-trend-footer">
+      <span>流式指标：24小时粒度</span>
+      <strong data-testid="telemetry-cache-efficiency">
+        缓存效率：{{ telemetryCacheEfficiency }}
+      </strong>
+    </footer>
+  </div>
+
+  <div v-else data-testid="telemetry-trend-card" class="card p-4">
     <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
       {{ t('admin.dashboard.tokenUsageTrend') }}
     </h3>
@@ -9,10 +63,7 @@
     <div v-else-if="trendData.length > 0 && chartData" class="h-48">
       <Line :data="chartData" :options="lineOptions" />
     </div>
-    <div
-      v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
+    <div v-else class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
       {{ t('admin.dashboard.noDataAvailable') }}
     </div>
   </div>
@@ -30,7 +81,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -52,177 +103,215 @@ const { t } = useI18n()
 const props = defineProps<{
   trendData: TrendDataPoint[]
   loading?: boolean
+  telemetry?: boolean
 }>()
 
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
-})
+const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
-  input: '#3b82f6',
-  output: '#10b981',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  text: isDarkMode.value ? '#c9c7d0' : '#76737c',
+  grid: isDarkMode.value ? '#383741' : '#eeedf3',
+  baseline: isDarkMode.value ? '#4b4956' : '#e3e2e7',
+  input: '#2855e8',
+  output: '#4db987',
+  cacheRead: '#efa934',
+  cacheHitRate: '#8b5cf6',
 }))
+
+const totals = computed(() => props.trendData.reduce(
+  (result, item) => {
+    result.input += item.input_tokens || 0
+    result.output += item.output_tokens || 0
+    result.cacheRead += item.cache_read_tokens || 0
+    result.prompt +=
+      (item.input_tokens || 0) + (item.cache_read_tokens || 0) + (item.cache_creation_tokens || 0)
+    return result
+  },
+  { input: 0, output: 0, cacheRead: 0, prompt: 0 }
+))
+
+const telemetryCacheEfficiency = computed(() => {
+  const efficiency = totals.value.prompt > 0
+    ? (totals.value.cacheRead / totals.value.prompt) * 100
+    : 0
+  return `${efficiency.toFixed(1)}%`
+})
+
+const telemetryMetrics = computed(() => [
+  { label: '输入', value: formatTokens(totals.value.input), color: chartColors.value.input },
+  { label: '输出', value: formatTokens(totals.value.output), color: chartColors.value.output },
+  { label: '缓存读取', value: formatTokens(totals.value.cacheRead), color: chartColors.value.cacheRead },
+  {
+    label: '命中率',
+    value: telemetryCacheEfficiency.value,
+    color: chartColors.value.cacheHitRate,
+    rate: true,
+  },
+])
 
 const chartData = computed(() => {
   if (!props.trendData?.length) return null
 
+  const sharedLineStyle = {
+    borderWidth: 2.25,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    pointHoverBorderWidth: 2,
+    tension: 0.42,
+  }
+
   return {
-    labels: props.trendData.map((d) => d.date),
+    labels: props.trendData.map((item) => formatTimeLabel(item.date)),
     datasets: [
       {
+        ...sharedLineStyle,
         label: 'Input',
-        data: props.trendData.map((d) => d.input_tokens),
+        data: props.trendData.map((item) => item.input_tokens),
         borderColor: chartColors.value.input,
-        backgroundColor: `${chartColors.value.input}20`,
+        backgroundColor: `${chartColors.value.input}16`,
+        pointHoverBackgroundColor: chartColors.value.input,
         fill: true,
-        tension: 0.3
       },
       {
+        ...sharedLineStyle,
         label: 'Output',
-        data: props.trendData.map((d) => d.output_tokens),
+        data: props.trendData.map((item) => item.output_tokens),
         borderColor: chartColors.value.output,
-        backgroundColor: `${chartColors.value.output}20`,
-        fill: true,
-        tension: 0.3
+        backgroundColor: 'transparent',
+        pointHoverBackgroundColor: chartColors.value.output,
+        fill: false,
       },
       {
-        label: 'Cache Creation',
-        data: props.trendData.map((d) => d.cache_creation_tokens),
-        borderColor: chartColors.value.cacheCreation,
-        backgroundColor: `${chartColors.value.cacheCreation}20`,
-        fill: true,
-        tension: 0.3
-      },
-      {
+        ...sharedLineStyle,
         label: 'Cache Read',
-        data: props.trendData.map((d) => d.cache_read_tokens),
+        data: props.trendData.map((item) => item.cache_read_tokens),
         borderColor: chartColors.value.cacheRead,
-        backgroundColor: `${chartColors.value.cacheRead}20`,
-        fill: true,
-        tension: 0.3
+        backgroundColor: 'transparent',
+        pointHoverBackgroundColor: chartColors.value.cacheRead,
+        fill: false,
       },
       {
+        ...sharedLineStyle,
         label: 'Cache Hit Rate',
-        data: props.trendData.map((d) => {
-          const totalPromptTokens = d.input_tokens + d.cache_read_tokens + d.cache_creation_tokens
-          return totalPromptTokens > 0 ? (d.cache_read_tokens / totalPromptTokens) * 100 : 0
+        data: props.trendData.map((item) => {
+          const promptTokens =
+            (item.input_tokens || 0) + (item.cache_read_tokens || 0) + (item.cache_creation_tokens || 0)
+          return promptTokens > 0 ? ((item.cache_read_tokens || 0) / promptTokens) * 100 : 0
         }),
         borderColor: chartColors.value.cacheHitRate,
-        backgroundColor: `${chartColors.value.cacheHitRate}20`,
-        borderDash: [5, 5],
+        backgroundColor: 'transparent',
+        pointHoverBackgroundColor: chartColors.value.cacheHitRate,
+        borderDash: [4, 3],
         fill: false,
-        tension: 0.3,
-        yAxisID: 'yPercent'
-      }
-    ]
+        yAxisID: 'yPercent',
+      },
+    ],
   }
 })
 
 const lineOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  normalized: true,
   interaction: {
     intersect: false,
-    mode: 'index' as const
+    mode: 'index' as const,
+  },
+  layout: {
+    padding: { top: 2, right: 2, bottom: 0, left: 0 },
   },
   plugins: {
     legend: {
-      position: 'top' as const,
-      labels: {
-        color: chartColors.value.text,
-        usePointStyle: true,
-        pointStyle: 'circle',
-        padding: 15,
-        font: {
-          size: 11
-        }
-      }
+      display: false,
     },
     tooltip: {
+      displayColors: true,
+      usePointStyle: true,
+      backgroundColor: isDarkMode.value ? '#1f1f24' : '#ffffff',
+      titleColor: isDarkMode.value ? '#ffffff' : '#111116',
+      bodyColor: isDarkMode.value ? '#d6d4dc' : '#76737c',
+      borderColor: isDarkMode.value ? '#494751' : '#eeedf3',
+      borderWidth: 1,
+      cornerRadius: 14,
+      padding: 14,
+      caretSize: 0,
+      titleFont: { family: 'ui-monospace, SFMono-Regular, Menlo, monospace', size: 12, weight: 'bold' as const },
+      bodyFont: { family: 'ui-monospace, SFMono-Regular, Menlo, monospace', size: 11 },
       callbacks: {
-        label: (context: any) => {
-          if (context.dataset.yAxisID === 'yPercent') {
-            return `${context.dataset.label}: ${context.raw.toFixed(1)}%`
-          }
-          return `${context.dataset.label}: ${formatTokens(context.raw)}`
-        },
-        footer: (tooltipItems: any) => {
-          const dataIndex = tooltipItems[0]?.dataIndex
-          if (dataIndex !== undefined && props.trendData[dataIndex]) {
-            const data = props.trendData[dataIndex]
-            return `Actual: $${formatCost(data.actual_cost)} | Standard: $${formatCost(data.cost)}`
-          }
-          return ''
-        }
-      }
-    }
+        title: (items: any[]) => props.trendData[items[0]?.dataIndex]?.date || '',
+        label: (context: any) => context.dataset.yAxisID === 'yPercent'
+          ? ` 命中率：${Number(context.raw).toFixed(1)}%`
+          : ` ${translateDatasetLabel(context.dataset.label)}：${formatTokens(Number(context.raw))}`,
+        footer: () => '',
+      },
+    },
   },
   scales: {
     x: {
-      grid: {
-        color: chartColors.value.grid
-      },
+      border: { color: chartColors.value.baseline },
+      grid: { display: false },
       ticks: {
         color: chartColors.value.text,
-        font: {
-          size: 10
-        }
-      }
+        maxRotation: 0,
+        minRotation: 0,
+        autoSkip: true,
+        maxTicksLimit: 7,
+        padding: 10,
+        font: { family: 'ui-monospace, SFMono-Regular, Menlo, monospace', size: 10 },
+      },
     },
     y: {
+      beginAtZero: true,
+      border: { display: false },
       grid: {
-        color: chartColors.value.grid
+        color: chartColors.value.grid,
+        borderDash: [3, 3],
+        drawTicks: false,
       },
       ticks: {
         color: chartColors.value.text,
-        font: {
-          size: 10
-        },
-        callback: (value: string | number) => formatTokens(Number(value))
-      }
+        maxTicksLimit: 5,
+        padding: 8,
+        callback: (value: string | number) => formatTokens(Number(value)),
+        font: { family: 'ui-monospace, SFMono-Regular, Menlo, monospace', size: 9 },
+      },
     },
     yPercent: {
       position: 'right' as const,
       min: 0,
       max: 100,
-      grid: {
-        drawOnChartArea: false
-      },
+      border: { display: false },
+      grid: { drawOnChartArea: false, drawTicks: false },
       ticks: {
         color: chartColors.value.cacheHitRate,
-        font: {
-          size: 10
-        },
-        callback: (value: string | number) => `${value}%`
-      }
-    }
-  }
+        stepSize: 25,
+        padding: 8,
+        callback: (value: string | number) => `${value}%`,
+        font: { family: 'ui-monospace, SFMono-Regular, Menlo, monospace', size: 9 },
+      },
+    },
+  },
 }))
 
-const formatTokens = (value: number): string => {
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(2)}B`
-  } else if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(2)}M`
-  } else if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(2)}K`
-  }
-  return value.toLocaleString()
+function formatTokens(value: number): string {
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000_000) return compactNumber(value / 1_000_000_000, 'B')
+  if (absolute >= 1_000_000) return compactNumber(value / 1_000_000, 'M')
+  if (absolute >= 1_000) return compactNumber(value / 1_000, 'K')
+  return value.toLocaleString('en-US')
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
-  }
-  return value.toFixed(4)
+function compactNumber(value: number, suffix: string): string {
+  const rounded = value.toFixed(1).replace(/\.0$/, '')
+  return `${rounded}${suffix}`
+}
+
+function formatTimeLabel(value: string): string {
+  const timeMatch = value.match(/(?:T|\s)(\d{2}:\d{2})/)
+  return timeMatch?.[1] || value
+}
+
+function translateDatasetLabel(label: string): string {
+  return ({ Input: '输入', Output: '输出', 'Cache Read': '缓存读取' } as Record<string, string>)[label] || label
 }
 </script>

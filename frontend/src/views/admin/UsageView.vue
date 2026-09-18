@@ -1,10 +1,21 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="telemetry-page space-y-6">
+      <section class="telemetry-page__intro" aria-label="Telemetry overview">
+        <div>
+          <p class="telemetry-page__eyebrow"><span aria-hidden="true"></span> TELEMETRY // USAGE</p>
+          <h2 class="telemetry-page__heading">{{ t('nav.usage') }}</h2>
+          <p class="telemetry-page__description">{{ t('usage.inSelectedRange') }}</p>
+        </div>
+        <div class="telemetry-page__window">
+          <span>WINDOW</span>
+          <strong>{{ startDate }} — {{ endDate }}</strong>
+        </div>
+      </section>
       <UsageStatsCards :stats="usageStats" />
       <!-- Charts Section -->
       <div class="space-y-4">
-        <div class="card p-4">
+        <div class="orbital-panel telemetry-command-bar p-3 sm:p-4">
           <div class="flex flex-wrap items-center gap-4">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
@@ -22,8 +33,9 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6">
           <ModelDistributionChart
+            telemetry
             v-model:source="modelDistributionSource"
             v-model:metric="modelDistributionMetric"
             :model-stats="requestedModelStats"
@@ -37,6 +49,7 @@
             :filters="breakdownFilters"
           />
           <GroupDistributionChart
+            telemetry
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
@@ -46,8 +59,9 @@
             :filters="breakdownFilters"
           />
         </div>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6">
           <EndpointDistributionChart
+            telemetry
             v-model:source="endpointDistributionSource"
             v-model:metric="endpointDistributionMetric"
             :endpoint-stats="inboundEndpointStats"
@@ -61,109 +75,162 @@
             :end-date="endDate"
             :filters="breakdownFilters"
           />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+          <TokenUsageTrend telemetry :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
-      <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
-      <div class="card">
-        <div class="flex flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
-          <button
-            v-for="tab in detailTabs"
-            :key="tab.key"
-            type="button"
-            data-testid="usage-detail-tab"
-            class="-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-colors sm:px-4"
-            :class="activeTab === tab.key
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-dark-500 dark:hover:text-gray-200'"
-            @click="switchTab(tab.key)"
-          >
-            <Icon :name="tab.icon" size="sm" />
-            {{ tab.label }}
-          </button>
+      <!-- 完整滚动参考页：筛选矩阵与明细台账拆分为两个独立面板 -->
+    <section class="orbital-panel telemetry-filter-panel" aria-label="Usage filters">
+      <div class="telemetry-section-heading">
+        <div>
+          <p class="telemetry-section-heading__eyebrow">QUERY // FILTER MATRIX</p>
+          <h3>{{ t('common.filter') }}</h3>
+        </div>
+        <span class="telemetry-section-heading__status"><i aria-hidden="true"></i> READY</span>
+      </div>
+      <UsageFilters
+        v-model="filters"
+        ref="usageFiltersRef"
+        flat
+        telemetry
+        :mode="activeTab"
+        :start-date="startDate"
+        :end-date="endDate"
+        :exporting="exporting"
+        :model-options="modelNameOptions"
+        @change="applyFilters"
+        @refresh="refreshData"
+        @reset="resetFilters"
+        @cleanup="openCleanupDialog"
+        @export="exportToExcel"
+      />
+    </section>
+
+    <section class="orbital-panel telemetry-ledger-panel" aria-label="Usage ledger">
+      <header class="telemetry-ledger-header">
+        <div class="telemetry-ledger-primary-tools">
+          <div class="telemetry-ledger-tabs" role="tablist">
+            <button
+              v-for="tab in detailTabs"
+              :key="tab.key"
+              type="button"
+              role="tab"
+              data-testid="usage-detail-tab"
+              :aria-selected="activeTab === tab.key"
+              :class="activeTab === tab.key ? 'is-active' : ''"
+              @click="switchTab(tab.key)"
+            >
+              <Icon :name="tab.icon" size="sm" />
+              <span>{{ tab.label }}</span>
+              <strong v-if="tab.key === 'usage'">{{ pagination.total.toLocaleString() }}</strong>
+              <strong v-else-if="tab.key === 'errors'" class="is-error">{{ errTotal.toLocaleString() }}</strong>
+            </button>
+          </div>
+          <span class="telemetry-live-state"><i aria-hidden="true"></i>{{ t('usage.liveSync') }}</span>
         </div>
 
-        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="border-b border-gray-100 dark:border-dark-700/50" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
-          <template #after-reset>
-            <div v-if="activeTab !== 'ranking'" class="relative" ref="columnDropdownRef">
+        <div class="telemetry-ledger-tools">
+          <span class="telemetry-record-total">{{ t('usage.telemetryRecordCount', { count: (activeTab === 'errors' ? errTotal : pagination.total).toLocaleString() }) }}</span>
+          <div v-if="activeTab !== 'ranking'" ref="columnDropdownRef" class="relative">
+            <button
+              data-testid="usage-column-settings"
+              type="button"
+              class="telemetry-column-settings"
+              :title="t('admin.users.columnSettings')"
+              @click="showColumnDropdown = !showColumnDropdown"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
+              </svg>
+              <span>{{ t('admin.users.columnSettings') }}</span>
+            </button>
+            <div
+              v-if="showColumnDropdown"
+              class="telemetry-column-menu"
+            >
               <button
-                data-testid="usage-column-settings"
-                @click="showColumnDropdown = !showColumnDropdown"
-                class="btn btn-secondary px-2 md:px-3"
-                :title="t('admin.users.columnSettings')"
+                v-for="col in currentToggleableColumns"
+                :key="col.key"
+                :data-testid="`usage-column-toggle-${col.key}`"
+                type="button"
+                @click="toggleCurrentColumn(col.key)"
               >
-                <svg class="h-4 w-4 md:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
-                </svg>
-                <span class="hidden md:inline">{{ t('admin.users.columnSettings') }}</span>
+                <span>{{ col.label }}</span>
+                <Icon
+                  v-if="isCurrentColumnVisible(col.key)"
+                  name="check"
+                  size="sm"
+                  class="text-primary-500"
+                  :stroke-width="2"
+                />
               </button>
-              <div
-                v-if="showColumnDropdown"
-                class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
-              >
-                <button
-                  v-for="col in currentToggleableColumns"
-                  :key="col.key"
-                  :data-testid="`usage-column-toggle-${col.key}`"
-                  @click="toggleCurrentColumn(col.key)"
-                  class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-                >
-                  <span>{{ col.label }}</span>
-                  <Icon
-                    v-if="isCurrentColumnVisible(col.key)"
-                    name="check"
-                    size="sm"
-                    class="text-primary-500"
-                    :stroke-width="2"
-                  />
-                </button>
-              </div>
             </div>
-          </template>
-        </UsageFilters>
+          </div>
+        </div>
+      </header>
 
-        <div v-show="activeTab === 'usage'" class="overflow-hidden rounded-b-2xl">
-          <UsageTable
-            flat
-            :data="usageLogs"
-            :loading="loading"
-            :columns="visibleColumns"
-            :server-side-sort="true"
-            :default-sort-key="'created_at'"
-            :default-sort-order="'desc'"
-            @sort="handleSort"
-            @userClick="handleUserClick"
-            @ipGeoBatchFailed="handleIpGeoBatchFailed"
-          />
-          <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
-        </div>
-        <div v-show="activeTab === 'errors'" class="overflow-hidden rounded-b-2xl">
-          <OpsErrorLogTable
-            flat
-            :rows="errRows" :total="errTotal" :loading="errLoading"
-            :page="errPage" :page-size="errPageSize"
-            :visible-column-keys="errVisibleColumnKeys"
-            user-clickable
-            @userClick="handleUserClick"
-            @openErrorDetail="openError"
-            @sort="onErrSort"
-            @update:page="onErrPage"
-            @update:pageSize="onErrPageSize"
-            @ipGeoBatchFailed="handleIpGeoBatchFailed" />
-        </div>
-        <!-- 懒挂载：首次切到该 tab 才请求排行数据，之后随筛选自动刷新 -->
-        <div v-if="rankingMounted" v-show="activeTab === 'ranking'" class="overflow-hidden rounded-b-2xl">
-          <UserTokenRanking
-            ref="rankingRef"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-            :model="filters.model"
-            @select-user="handleRankingSelectUser"
-          />
+      <div v-show="activeTab === 'usage'" class="telemetry-ledger-body">
+        <UsageTable
+          flat
+          telemetry
+          :data="usageLogs"
+          :loading="loading"
+          :columns="visibleColumns"
+          :server-side-sort="true"
+          :default-sort-key="'created_at'"
+          :default-sort-order="'desc'"
+          @sort="handleSort"
+          @userClick="handleUserClick"
+          @ipGeoBatchFailed="handleIpGeoBatchFailed"
+        />
+        <div v-if="pagination.total > 0" class="telemetry-ledger-pagination">
+          <Pagination
+            :page="pagination.page"
+            :total="pagination.total"
+            :page-size="pagination.page_size"
+            :show-page-size-selector="false"
+            @update:page="handlePageChange"
+            @update:pageSize="handlePageSizeChange"
+          >
+            <template #info="{ from, to, total }">
+              <p class="telemetry-pagination-summary">
+                {{ t('usage.telemetryPagination', { from, to, total: total.toLocaleString() }) }}
+              </p>
+            </template>
+          </Pagination>
         </div>
       </div>
-      <OpsErrorDetailModal v-model:show="showErrorModal" :error-id="selectedErrorId" :error-type="'request'" />
+
+      <div v-show="activeTab === 'errors'" class="telemetry-ledger-body">
+        <OpsErrorLogTable
+          flat
+          :rows="errRows"
+          :total="errTotal"
+          :loading="errLoading"
+          :page="errPage"
+          :page-size="errPageSize"
+          :visible-column-keys="errVisibleColumnKeys"
+          user-clickable
+          @userClick="handleUserClick"
+          @openErrorDetail="openError"
+          @sort="onErrSort"
+          @update:page="onErrPage"
+          @update:pageSize="onErrPageSize"
+          @ipGeoBatchFailed="handleIpGeoBatchFailed"
+        />
+      </div>
+
+      <div v-if="rankingMounted" v-show="activeTab === 'ranking'" class="telemetry-ledger-body">
+        <UserTokenRanking
+          ref="rankingRef"
+          :start-date="startDate"
+          :end-date="endDate"
+          :filters="breakdownFilters"
+          :model="filters.model"
+          @select-user="handleRankingSelectUser"
+        />
+      </div>
+    </section>
+    <OpsErrorDetailModal v-model:show="showErrorModal" :error-id="selectedErrorId" :error-type="'request'" />
     </div>
   </AppLayout>
   <UsageExportProgress :show="exportProgress.show" :progress="exportProgress.progress" :current="exportProgress.current" :total="exportProgress.total" :estimated-time="exportProgress.estimatedTime" @cancel="cancelExport" />
@@ -630,28 +697,28 @@ const exportToExcel = async () => {
 
 // Column visibility
 const ALWAYS_VISIBLE = ['user', 'created_at']
-const DEFAULT_HIDDEN_COLUMNS = ['reasoning_effort', 'request_id', 'upstream_request_id', 'user_agent']
+const DEFAULT_HIDDEN_COLUMNS = ['group', 'request_id', 'upstream_request_id', 'user_agent', 'ip_address']
 const HIDDEN_COLUMNS_KEY = 'usage-hidden-columns'
 const HIDDEN_COLUMNS_VERSION_KEY = 'usage-hidden-columns-version'
 // 隐藏列版本链：每级只把当级新增列加入隐藏集，不重置用户已显式打开的列。
 const HIDDEN_COLUMNS_PREV_VERSION = 'request-id-hidden-by-default'
-const HIDDEN_COLUMNS_CURRENT_VERSION = 'upstream-request-id-hidden-by-default'
+const HIDDEN_COLUMNS_CURRENT_VERSION = 'orbital-telemetry-ledger-v1'
 
 const allColumns = computed(() => [
   { key: 'user', label: t('admin.usage.user'), sortable: false },
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'account', label: t('admin.usage.account'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
-  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
+  { key: 'reasoning_effort', label: '推理强度', sortable: false },
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
   { key: 'group', label: t('admin.usage.group'), sortable: false },
-  { key: 'stream', label: t('usage.type'), sortable: false },
+  { key: 'stream', label: '协议', sortable: false },
   { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
-  { key: 'tokens', label: t('usage.tokens'), sortable: false },
-  { key: 'cache_hit_rate', label: t('usage.cacheHitRate'), sortable: false },
+  { key: 'tokens', label: 'TOKEN 吞吐指标', sortable: false },
+  { key: 'cache_hit_rate', label: t('usage.cacheHit'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
-  { key: 'latency', label: t('usage.latency'), sortable: false },
-  { key: 'created_at', label: t('usage.time'), sortable: true },
+  { key: 'latency', label: '延迟 / 耗时', sortable: false },
+  { key: 'created_at', label: '时间 / 来源 IP', sortable: true },
   { key: 'request_id', label: t('admin.usage.requestId'), sortable: false },
   { key: 'upstream_request_id', label: t('admin.usage.upstreamRequestId'), sortable: false },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
@@ -767,6 +834,9 @@ const loadSavedColumns = () => {
           hiddenColumns.add('request_id')
         }
         hiddenColumns.add('upstream_request_id')
+        hiddenColumns.add('group')
+        hiddenColumns.add('ip_address')
+        hiddenColumns.delete('reasoning_effort')
         localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
         localStorage.setItem(HIDDEN_COLUMNS_VERSION_KEY, HIDDEN_COLUMNS_CURRENT_VERSION)
       }

@@ -1,9 +1,15 @@
 <template>
-  <div :class="flat ? 'p-4 sm:p-6' : 'card p-6'">
+  <div
+    data-testid="usage-filter-matrix"
+    :class="[
+      flat ? 'p-4 sm:p-6' : 'card p-6',
+      telemetry ? 'telemetry-filter-matrix' : ''
+    ]"
+  >
     <!-- Toolbar: left filters (multi-line) + right actions -->
-    <div class="flex flex-wrap items-end justify-between gap-4">
+    <div class="telemetry-filter-layout flex flex-wrap items-end justify-between gap-4">
       <!-- Left: filters (allowed to wrap to multiple rows) -->
-      <div class="flex flex-1 flex-wrap items-end gap-4">
+      <div class="telemetry-filter-fields flex flex-1 flex-wrap items-end gap-4">
         <!-- User Search -->
         <div ref="userSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
           <label class="input-label">{{ t('admin.usage.userFilter') }}</label>
@@ -177,7 +183,7 @@
       </div>
 
       <!-- Right: actions -->
-      <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+      <div v-if="showActions" class="telemetry-filter-actions flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
         <button type="button" @click="$emit('refresh')" class="btn btn-secondary">
           {{ t('common.refresh') }}
         </button>
@@ -222,12 +228,14 @@ interface Props {
   mode?: 'usage' | 'errors' | 'ranking'
   /** 嵌入统一卡片内使用：去掉自身卡片外观 */
   flat?: boolean
+  telemetry?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showActions: true,
   mode: 'usage',
-  flat: false
+  flat: false,
+  telemetry: false
 })
 const emit = defineEmits([
   'update:modelValue',

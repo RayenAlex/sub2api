@@ -657,9 +657,12 @@ const DOCKER_IMAGE = 'weishaw/sub2api'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   version?: string
-}>()
+  expanded?: boolean
+}>(), {
+  expanded: false,
+})
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -731,8 +734,13 @@ const activeManualCommand = computed(() =>
 // Only show update check for release builds (binary/docker deployment)
 const isReleaseBuild = computed(() => buildType.value === 'release')
 
-function toggleDropdown() {
-  dropdownOpen.value = !dropdownOpen.value
+async function toggleDropdown() {
+  const nextOpen = !dropdownOpen.value
+  dropdownOpen.value = nextOpen
+
+  if (nextOpen && props.expanded && !rollbackPanelOpen.value) {
+    await toggleRollbackPanel()
+  }
 }
 
 function closeDropdown() {
@@ -803,6 +811,9 @@ async function loadRollbackVersions() {
   try {
     const data = await getRollbackVersions()
     rollbackVersions.value = data.versions || []
+    if (props.expanded && !selectedRollbackVersion.value && rollbackVersions.value.length > 0) {
+      selectedRollbackVersion.value = rollbackVersions.value[0].version
+    }
   } catch (error: unknown) {
     const err = error as { response?: { data?: { message?: string } }; message?: string }
     rollbackVersionsError.value =

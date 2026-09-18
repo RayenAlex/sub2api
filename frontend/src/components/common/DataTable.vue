@@ -1,5 +1,9 @@
 <template>
-  <div v-if="!isDesktopViewport" class="space-y-3">
+  <div
+    v-if="!isDesktopViewport"
+    class="space-y-3"
+    :class="variant === 'telemetry' ? 'data-table--telemetry data-table--telemetry-mobile' : ''"
+  >
     <template v-if="loading">
       <div v-for="i in 5" :key="i" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
         <div class="space-y-3">
@@ -96,7 +100,8 @@
     class="table-wrapper"
     :class="{
       'actions-expanded': actionsExpanded,
-      'is-scrollable': isScrollable
+      'is-scrollable': isScrollable,
+      'data-table--telemetry': variant === 'telemetry'
     }"
   >
     <table class="w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
@@ -122,6 +127,7 @@
             :key="column.key"
             scope="col"
             :aria-sort="column.sortable ? getColumnAriaSort(column.key) : undefined"
+            :data-column-key="column.key"
             :class="[
               'sticky-header-cell py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400',
               getAdaptivePaddingClass(),
@@ -234,6 +240,7 @@
             <td
               v-for="(column, colIndex) in columns"
               :key="column.key"
+              :data-column-key="column.key"
               :class="[
                 'whitespace-nowrap py-4 text-sm text-gray-900 dark:text-gray-100',
                 getAdaptivePaddingClass(),
@@ -471,6 +478,7 @@ interface Props {
   selectedKeys?: Array<string | number>
   /** Accessible label for a row selection checkbox. */
   selectionLabel?: string | ((row: any) => string)
+  variant?: 'default' | 'telemetry'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -481,7 +489,8 @@ const props = withDefaults(defineProps<Props>(), {
   defaultSortOrder: 'asc',
   serverSideSort: false,
   selectable: false,
-  selectedKeys: () => []
+  selectedKeys: () => [],
+  variant: 'default'
 })
 
 const sortKey = ref<string>('')

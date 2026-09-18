@@ -464,6 +464,9 @@ export default {
       detailAccuracy: 'Accuracy',
       detailCoordinates: 'Coordinates',
     },
+    liveSync: 'Live sync',
+    telemetryRecordCount: '{count} telemetry records',
+    telemetryPagination: 'Showing {from} to {to} of {total} telemetry records',
     tabs: { usage: 'Usage', errors: 'Error Requests', ranking: 'User Ranking' },
     errors: {
       time: 'Time', model: 'Model', endpoint: 'Endpoint', status: 'Status',

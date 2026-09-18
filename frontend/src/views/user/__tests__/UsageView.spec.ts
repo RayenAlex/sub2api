@@ -115,8 +115,22 @@ vi.mock('vue-i18n', async () => {
 })
 
 const simpleStub = { template: '<div><slot /></div>' }
-const chartStub = { template: '<div />' }
-const usageTableStub = { props: ['columns'], template: '<div />' }
+const statsStub = { name: 'UsageStatsCards', props: { telemetry: Boolean, showAccountCost: Boolean, strikeStandardCost: Boolean }, template: '<div />' }
+const modelChartStub = { name: 'ModelDistributionChart', props: { telemetry: Boolean }, template: '<div />' }
+const groupChartStub = { name: 'GroupDistributionChart', props: { telemetry: Boolean }, template: '<div />' }
+const endpointChartStub = { name: 'EndpointDistributionChart', props: { telemetry: Boolean }, template: '<div />' }
+const tokenChartStub = { name: 'TokenUsageTrend', props: { telemetry: Boolean }, template: '<div />' }
+const errorTableStub = { name: 'UserErrorRequestsTable', template: '<div />' }
+const usageTableStub = {
+  props: {
+    columns: Array,
+    telemetry: Boolean,
+    flat: Boolean,
+    showAccountBilling: Boolean,
+    showUpstreamEndpoint: Boolean,
+  },
+  template: '<div />',
+}
 
 const usageLog = {
   id: 1,
@@ -159,13 +173,13 @@ function mountUsageView() {
         Select: true,
         DateRangePicker: true,
         Icon: true,
-        UsageStatsCards: chartStub,
+        UsageStatsCards: statsStub,
         UsageTable: usageTableStub,
-        UserErrorRequestsTable: chartStub,
-        ModelDistributionChart: chartStub,
-        GroupDistributionChart: chartStub,
-        EndpointDistributionChart: chartStub,
-        TokenUsageTrend: chartStub,
+        UserErrorRequestsTable: errorTableStub,
+        ModelDistributionChart: modelChartStub,
+        GroupDistributionChart: groupChartStub,
+        EndpointDistributionChart: endpointChartStub,
+        TokenUsageTrend: tokenChartStub,
       },
     },
   })
@@ -540,6 +554,38 @@ describe('user UsageView', () => {
     expect(columnKeys.indexOf('cache_hit_rate')).toBe(columnKeys.indexOf('tokens') + 1)
   })
 
+})
+
+describe('user UsageView telemetry shell', () => {
+  it('uses the Orbital telemetry layout without exposing admin-only controls', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(wrapper.find('.telemetry-page').exists()).toBe(true)
+    expect(wrapper.find('.telemetry-page__intro').exists()).toBe(true)
+    expect(wrapper.find('.telemetry-page__window').exists()).toBe(true)
+    expect(wrapper.find('.telemetry-command-bar').exists()).toBe(true)
+    expect(wrapper.find('.telemetry-filter-panel').exists()).toBe(true)
+    expect(wrapper.find('.telemetry-ledger-panel').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="usage-admin-user-filter"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="usage-admin-ranking"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="usage-admin-cleanup"]').exists()).toBe(false)
+
+    expect(wrapper.findComponent(modelChartStub).props('telemetry')).toBe(true)
+    expect(wrapper.findComponent(groupChartStub).props('telemetry')).toBe(true)
+    expect(wrapper.findComponent(endpointChartStub).props('telemetry')).toBe(true)
+    expect(wrapper.findComponent(tokenChartStub).props('telemetry')).toBe(true)
+
+    const stats = wrapper.findComponent(statsStub)
+    expect(stats.props('showAccountCost')).toBe(false)
+    expect(stats.props('strikeStandardCost')).toBe(true)
+
+    const table = wrapper.findComponent(UsageTable)
+    expect(table.props('telemetry')).toBe(true)
+    expect(table.props('flat')).toBe(true)
+    expect(table.props('showAccountBilling')).toBe(false)
+    expect(table.props('showUpstreamEndpoint')).toBe(false)
+  })
 })
 
 describe('UsageView subscription feature flag', () => {

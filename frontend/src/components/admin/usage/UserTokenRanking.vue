@@ -4,7 +4,26 @@
     <!-- Toolbar -->
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-dark-700/50 sm:px-6">
       <p class="text-xs text-gray-400 dark:text-gray-500">{{ t('admin.usage.tokenRanking.subtitle') }}</p>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <div
+          class="flex rounded-lg border border-gray-200 p-0.5 dark:border-dark-600"
+          role="group"
+          :aria-label="t('admin.usage.tokenRanking.periods.label')"
+        >
+          <button
+            v-for="option in periodOptions"
+            :key="option.value"
+            type="button"
+            :data-testid="`token-ranking-period-${option.value}`"
+            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+            :class="rankingPeriod === option.value
+              ? 'bg-primary-500 text-white shadow-sm'
+              : 'text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-700'"
+            @click="selectPeriod(option.value)"
+          >
+            {{ t(option.label) }}
+          </button>
+        </div>
         <span v-if="!loading && items.length > 0" class="text-xs text-gray-400 dark:text-gray-500">
           {{ t('admin.usage.tokenRanking.userCount', { count: items.length }) }}
         </span>
@@ -12,8 +31,8 @@
           <Select v-model="limit" :options="limitOptions" @change="load" />
         </div>
       </div>
-    </div>
 
+    </div>
     <!-- Table -->
     <div class="overflow-x-auto">
       <table class="w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
@@ -116,6 +135,35 @@ const limitOptions = [
   { value: 200, label: 'Top 200' },
 ]
 
+type RankingPeriod = 'custom' | 'day' | 'week'
+
+const periodOptions: Array<{ value: RankingPeriod; label: string }> = [
+  { value: 'day', label: 'admin.usage.tokenRanking.periods.day' },
+  { value: 'week', label: 'admin.usage.tokenRanking.periods.week' },
+  { value: 'custom', label: 'admin.usage.tokenRanking.periods.custom' },
+]
+
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getRankingRange = (period: RankingPeriod): { startDate: string; endDate: string } => {
+  if (period === 'custom') {
+    return { startDate: props.startDate, endDate: props.endDate }
+  }
+
+  const end = new Date()
+  const start = new Date(end)
+  if (period === 'week') {
+    start.setDate(start.getDate() - 6)
+  }
+
+  return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) }
+}
+
 // 前三名金/银/铜徽章
 const RANK_BADGE_CLASSES = [
   'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
@@ -127,6 +175,7 @@ const items = ref<UserBreakdownItem[]>([])
 const loading = ref(false)
 const sortBy = ref<SortKey>('total_tokens')
 const limit = ref(50)
+const rankingPeriod = ref<RankingPeriod>('custom')
 let reqSeq = 0
 
 const fmtTokens = (v: number) => formatCompactNumber(v)
@@ -138,14 +187,21 @@ const setSort = (key: SortKey) => {
   load()
 }
 
+const selectPeriod = (period: RankingPeriod) => {
+  if (rankingPeriod.value === period) return
+  rankingPeriod.value = period
+  void load()
+}
+
 const load = async () => {
   const seq = ++reqSeq
   loading.value = true
   try {
+    const { startDate, endDate } = getRankingRange(rankingPeriod.value)
     const params: UserBreakdownParams = {
       ...props.filters,
-      start_date: props.startDate,
-      end_date: props.endDate,
+      start_date: startDate,
+      end_date: endDate,
       sort_by: sortBy.value,
       limit: limit.value,
     }

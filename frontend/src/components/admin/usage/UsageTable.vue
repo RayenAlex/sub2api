@@ -1,5 +1,13 @@
 <template>
-  <div :class="flat ? '' : 'card overflow-hidden'">
+  <div
+    :class="[
+      flat ? '' : 'card overflow-hidden',
+      telemetry ? 'telemetry-usage-table' : '',
+      telemetryExpanded ? 'telemetry-usage-table--expanded' : '',
+      telemetryCompact ? 'telemetry-usage-table--compact' : '',
+    ]"
+    :style="telemetryLayoutStyle"
+  >
     <div
       v-if="showIpGeoToolbar"
       class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
@@ -18,6 +26,9 @@
     </div>
     <div class="overflow-auto">
       <DataTable
+        :variant="telemetry ? 'telemetry' : 'default'"
+        :sticky-first-column="!telemetry"
+        :sticky-actions-column="!telemetry"
         :columns="columns"
         :data="data"
         :loading="loading"
@@ -27,7 +38,14 @@
         @sort="(key, order) => $emit('sort', key, order)"
       >
         <template #cell-user="{ row }">
-          <div class="text-sm">
+          <button
+            v-if="telemetry && row.user?.email"
+            class="telemetry-ledger-primary-text"
+            @click="$emit('userClick', row.user_id, row.user?.email)"
+          >
+            {{ row.user.email }}
+          </button>
+          <div v-else class="text-sm">
             <button
               v-if="row.user?.email"
               class="font-medium text-primary-600 underline decoration-dashed underline-offset-2 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
@@ -45,15 +63,18 @@
         </template>
 
         <template #cell-api_key="{ row }">
-          <span class="text-sm text-gray-900 dark:text-white">{{ row.api_key?.name || '-' }}</span>
+          <span v-if="telemetry" class="telemetry-ledger-primary-text">{{ row.api_key?.name || '-' }}</span>
+          <span v-else class="text-sm text-gray-900 dark:text-white">{{ row.api_key?.name || '-' }}</span>
         </template>
 
         <template #cell-account="{ row }">
-          <span class="text-sm text-gray-900 dark:text-white">{{ row.account?.name || '-' }}</span>
+          <span v-if="telemetry" class="telemetry-ledger-primary-text">{{ row.account?.name || '-' }}</span>
+          <span v-else class="text-sm text-gray-900 dark:text-white">{{ row.account?.name || '-' }}</span>
         </template>
 
         <template #cell-model="{ row }">
-          <div class="space-y-0.5 text-xs">
+          <span v-if="telemetry" class="telemetry-ledger-primary-text whitespace-nowrap">{{ row.model || '-' }}</span>
+          <div v-else class="space-y-0.5 text-xs">
             <div v-if="row.model_mapping_chain && row.model_mapping_chain.includes('→')" class="space-y-0.5">
               <div v-for="(step, i) in row.model_mapping_chain.split('→')" :key="i"
                    class="break-all"
@@ -91,7 +112,8 @@
         </template>
 
         <template #cell-reasoning_effort="{ row }">
-          <div v-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
+          <span v-if="telemetry" class="telemetry-reasoning-pill">{{ formatReasoningEffort(row.reasoning_effort) }}</span>
+          <div v-else-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
             <div class="font-medium text-gray-900 dark:text-white">
               {{ formatReasoningEffort(row.reasoning_effort) }}
             </div>
@@ -105,7 +127,7 @@
         </template>
 
         <template #cell-endpoint="{ row }">
-          <div class="max-w-[320px] space-y-1 text-xs">
+          <div :class="telemetry ? 'telemetry-endpoint-cell' : 'max-w-[320px] space-y-1 text-xs'">
             <div class="break-all text-gray-700 dark:text-gray-300">
               <span class="font-medium text-gray-500 dark:text-gray-400">{{ t('usage.inbound') }}:</span>
               <span class="ml-1">{{ row.inbound_endpoint?.trim() || '-' }}</span>
@@ -125,7 +147,10 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <div class="flex flex-wrap items-center gap-1">
+          <span v-if="telemetry" data-testid="telemetry-protocol" class="telemetry-protocol-badge">
+            {{ telemetryProtocol(row) }}
+          </span>
+          <div v-else class="flex flex-wrap items-center gap-1">
             <span data-testid="request-type-badge" class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="getRequestTypeBadgeClass(row)">
               {{ getRequestTypeLabel(row) }}
             </span>
@@ -140,14 +165,41 @@
         </template>
 
         <template #cell-billing_mode="{ row }">
-          <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="getBillingModeBadgeClass(getDisplayBillingMode(row))">
+          <span
+            v-if="telemetry"
+            class="telemetry-billing-pill"
+          >{{ getBillingModeLabel(getDisplayBillingMode(row), t) }}</span>
+          <span v-else class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="getBillingModeBadgeClass(getDisplayBillingMode(row))">
             {{ getBillingModeLabel(getDisplayBillingMode(row), t) }}
           </span>
         </template>
 
         <template #cell-tokens="{ row }">
+          <div
+            v-if="telemetry"
+            data-testid="telemetry-token-throughput"
+            class="telemetry-token-throughput"
+            @mouseenter="showTokenTooltip($event, row)"
+            @mouseleave="hideTokenTooltip"
+          >
+            <div class="telemetry-token-line">
+              <span class="telemetry-token-label">IN</span>
+              <strong>{{ row.input_tokens?.toLocaleString() || 0 }}</strong>
+              <span class="telemetry-token-divider">/</span>
+              <span class="telemetry-token-label telemetry-token-label--out">OUT</span>
+              <strong>{{ row.output_tokens?.toLocaleString() || 0 }}</strong>
+              <svg class="telemetry-token-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M4 7h10M18 7h2M14 4v6M4 17h2M10 17h10M8 14v6M4 12h4M12 12h8M10 9v6" stroke-width="1.7" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="telemetry-cache-line">
+              <i aria-hidden="true"></i>
+              <strong>{{ formatCacheTokens(row.cache_read_tokens || 0) }}</strong>
+              <span>KV CACHE</span>
+            </div>
+          </div>
           <!-- 图片生成请求（仅按次计费时显示图片格式） -->
-          <div v-if="isImageUsage(row)" class="flex items-center gap-1.5">
+          <div v-else-if="isImageUsage(row)" class="flex items-center gap-1.5">
             <svg class="h-4 w-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -225,15 +277,16 @@
           <span
             data-testid="cache-hit-rate"
             :title="t('usage.cacheHitRateHint')"
-            class="inline-flex min-w-14 justify-center rounded px-2 py-1 text-sm font-semibold tabular-nums"
-            :class="cacheHitRateClass(row)"
+            class="inline-flex min-w-14 items-center justify-center gap-1 rounded px-2 py-1 text-sm font-semibold leading-none tabular-nums"
+            :class="telemetry ? 'telemetry-cache-hit-pill' : cacheHitRateClass(row)"
           >
             {{ formatCacheHitRate(row) }}
           </span>
         </template>
 
         <template #cell-cost="{ row }">
-          <div class="text-sm">
+          <span v-if="telemetry" class="telemetry-cost-value">${{ row.actual_cost?.toFixed(6) || '0.000000' }}</span>
+          <div v-else class="text-sm">
             <div class="flex items-center gap-1.5">
               <span class="font-medium text-green-600 dark:text-green-400">${{ row.actual_cost?.toFixed(6) || '0.000000' }}</span>
             </div>
@@ -245,7 +298,11 @@
 
         <!-- 合并首字节/总耗时的健康度列：左侧彩条上端随首字节、下端随总耗时，中段(40%-60%)渐变过渡，便于纵向扫视整体健康状况 -->
         <template #cell-latency="{ row }">
-          <div class="flex items-stretch gap-2">
+          <div v-if="telemetry" data-testid="telemetry-latency" class="telemetry-latency-cell">
+            <strong>{{ formatDuration(row.first_token_ms) }} / {{ formatDuration(row.duration_ms) }}</strong>
+            <span>{{ formatThroughput(row) }} tok/s</span>
+          </div>
+          <div v-else class="flex items-stretch gap-2">
             <span
               class="w-1 shrink-0 rounded-full"
               :class="row.first_token_ms != null
@@ -263,8 +320,12 @@
           </div>
         </template>
 
-        <template #cell-created_at="{ value }">
-          <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
+        <template #cell-created_at="{ row, value }">
+          <div v-if="telemetry" data-testid="telemetry-time-source" class="telemetry-time-source-cell">
+            <strong>{{ formatTelemetryTime(value) }}</strong>
+            <span>{{ row.ip_address || '-' }}</span>
+          </div>
+          <span v-else class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
         </template>
 
         <template #cell-request_id="{ row }">
@@ -321,86 +382,91 @@
     </div>
   </div>
 
-  <!-- Token Tooltip Portal -->
+  <!-- Token breakdown popover -->
   <Teleport to="body">
     <div
       v-if="tokenTooltipVisible"
-      class="fixed z-[9999] pointer-events-none -translate-y-1/2"
+      class="telemetry-token-popover-anchor"
       :style="{
         left: tokenTooltipPosition.x + 'px',
         top: tokenTooltipPosition.y + 'px'
       }"
     >
-      <div class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
-        <div class="space-y-1.5">
-          <div>
-            <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.tokenDetails') }}</div>
-            <div v-if="tokenTooltipData && tokenTooltipData.input_tokens > 0 && !hasImageInputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.inputTokens') }}</span>
-              <span class="font-medium text-white">{{ tokenTooltipData.input_tokens.toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && hasImageInputTokens(tokenTooltipData) && textInputTokens(tokenTooltipData) > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.inputTokens') }}</span>
-              <span class="font-medium text-white">{{ textInputTokens(tokenTooltipData).toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && hasImageInputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('usage.imageInputTokens') }}</span>
-              <span class="font-medium text-fuchsia-300">{{ tokenTooltipData.image_input_tokens.toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && tokenTooltipData.output_tokens > 0 && !hasImageOutputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.outputTokens') }}</span>
-              <span class="font-medium text-white">{{ tokenTooltipData.output_tokens.toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && hasImageOutputTokens(tokenTooltipData) && textOutputTokens(tokenTooltipData) > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.outputTokens') }}</span>
-              <span class="font-medium text-white">{{ textOutputTokens(tokenTooltipData).toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && hasImageOutputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('usage.imageOutputTokens') }}</span>
-              <span class="font-medium text-pink-300">{{ tokenTooltipData.image_output_tokens.toLocaleString() }}</span>
-            </div>
-            <div v-if="tokenTooltipData && tokenTooltipData.cache_creation_tokens > 0">
-              <!-- 有 5m/1h 明细时，展开显示 -->
-              <template v-if="tokenTooltipData.cache_creation_5m_tokens > 0 || tokenTooltipData.cache_creation_1h_tokens > 0">
-                <div v-if="tokenTooltipData.cache_creation_5m_tokens > 0" class="flex items-center justify-between gap-4">
-                  <span class="text-gray-400 flex items-center gap-1.5">
-                    {{ t('admin.usage.cacheCreation5mTokens') }}
-                    <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-amber-500/20 text-amber-400 ring-1 ring-inset ring-amber-500/30">5m</span>
-                  </span>
-                  <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_5m_tokens.toLocaleString() }}</span>
-                </div>
-                <div v-if="tokenTooltipData.cache_creation_1h_tokens > 0" class="flex items-center justify-between gap-4">
-                  <span class="text-gray-400 flex items-center gap-1.5">
-                    {{ t('admin.usage.cacheCreation1hTokens') }}
-                    <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-500/20 text-orange-400 ring-1 ring-inset ring-orange-500/30">1h</span>
-                  </span>
-                  <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_1h_tokens.toLocaleString() }}</span>
-                </div>
-              </template>
-              <!-- 无明细时，只显示聚合值 -->
-              <div v-else class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('admin.usage.cacheCreationTokens') }}</span>
-                <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_tokens.toLocaleString() }}</span>
-              </div>
-            </div>
-            <div v-if="tokenTooltipData && tokenTooltipData.cache_ttl_overridden" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400 flex items-center gap-1.5">
-                {{ t('usage.cacheTtlOverriddenLabel') }}
-                <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-500/20 text-rose-400 ring-1 ring-inset ring-rose-500/30">R-{{ tokenTooltipData.cache_creation_1h_tokens > 0 ? '5m' : '1H' }}</span>
-              </span>
-              <span class="font-medium text-rose-400">{{ tokenTooltipData.cache_creation_1h_tokens > 0 ? t('usage.cacheTtlOverridden1h') : t('usage.cacheTtlOverridden5m') }}</span>
-            </div>
-            <div v-if="tokenTooltipData && tokenTooltipData.cache_read_tokens > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.cacheReadTokens') }}</span>
-              <span class="font-medium text-white">{{ tokenTooltipData.cache_read_tokens.toLocaleString() }}</span>
-            </div>
-          </div>
-          <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
-            <span class="text-gray-400">{{ t('usage.totalTokens') }}</span>
-            <span class="font-semibold text-blue-400">{{ ((tokenTooltipData?.input_tokens || 0) + (tokenTooltipData?.output_tokens || 0) + (tokenTooltipData?.cache_creation_tokens || 0) + (tokenTooltipData?.cache_read_tokens || 0)).toLocaleString() }}</span>
-          </div>
+      <div
+        data-testid="telemetry-token-breakdown"
+        class="telemetry-token-breakdown"
+      >
+        <div class="telemetry-token-breakdown__header">
+          <div><i aria-hidden="true"></i><span>TOKEN BREAKDOWN</span></div>
+          <small>REALTIME</small>
         </div>
-        <div class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"></div>
+
+        <div
+          class="telemetry-token-breakdown__progress"
+          role="progressbar"
+          aria-label="Cache read share"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="tokenTooltipCacheRatio.toFixed(1)"
+        >
+          <span :style="{ width: tokenTooltipCacheRatio + '%' }"></span>
+        </div>
+
+        <dl v-if="tokenTooltipData" class="telemetry-token-breakdown__rows">
+          <template v-if="hasImageInputTokens(tokenTooltipData)">
+            <div v-if="textInputTokens(tokenTooltipData) > 0">
+              <dt>Text Input (Prompt)</dt>
+              <dd>{{ textInputTokens(tokenTooltipData).toLocaleString() }}</dd>
+            </div>
+            <div>
+              <dt>Image Input</dt>
+              <dd>{{ tokenTooltipData.image_input_tokens.toLocaleString() }}</dd>
+            </div>
+          </template>
+          <div v-else>
+            <dt>Input (Prompt)</dt>
+            <dd>{{ tokenTooltipData.input_tokens.toLocaleString() }}</dd>
+          </div>
+
+          <template v-if="hasImageOutputTokens(tokenTooltipData)">
+            <div v-if="textOutputTokens(tokenTooltipData) > 0">
+              <dt>Text Output (Completion)</dt>
+              <dd>{{ textOutputTokens(tokenTooltipData).toLocaleString() }}</dd>
+            </div>
+            <div>
+              <dt>Image Output</dt>
+              <dd>{{ tokenTooltipData.image_output_tokens.toLocaleString() }}</dd>
+            </div>
+          </template>
+          <div v-else>
+            <dt>Output (Completion)</dt>
+            <dd>{{ tokenTooltipData.output_tokens.toLocaleString() }}</dd>
+          </div>
+
+          <template v-if="tokenTooltipData.cache_creation_5m_tokens > 0 || tokenTooltipData.cache_creation_1h_tokens > 0">
+            <div v-if="tokenTooltipData.cache_creation_5m_tokens > 0">
+              <dt>Cache Creation (5m)</dt>
+              <dd>{{ tokenTooltipData.cache_creation_5m_tokens.toLocaleString() }}</dd>
+            </div>
+            <div v-if="tokenTooltipData.cache_creation_1h_tokens > 0">
+              <dt>Cache Creation (1h)</dt>
+              <dd>{{ tokenTooltipData.cache_creation_1h_tokens.toLocaleString() }}</dd>
+            </div>
+          </template>
+          <div v-else-if="tokenTooltipData.cache_creation_tokens > 0">
+            <dt>Cache Creation</dt>
+            <dd>{{ tokenTooltipData.cache_creation_tokens.toLocaleString() }}</dd>
+          </div>
+          <div>
+            <dt>Cache Read</dt>
+            <dd class="is-cache">{{ tokenTooltipData.cache_read_tokens.toLocaleString() }}</dd>
+          </div>
+        </dl>
+
+        <div class="telemetry-token-breakdown__total">
+          <span>TOTAL TOKENS</span>
+          <strong>{{ tokenTooltipTotal.toLocaleString() }}</strong>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -465,6 +531,7 @@ interface Props {
   showUpstreamEndpoint?: boolean
   /** 嵌入统一卡片内使用：去掉自身卡片外观 */
   flat?: boolean
+  telemetry?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -474,7 +541,8 @@ const props = withDefaults(defineProps<Props>(), {
   defaultSortOrder: 'asc',
   showAccountBilling: true,
   showUpstreamEndpoint: true,
-  flat: false
+  flat: false,
+  telemetry: false
 })
 const emit = defineEmits<{
   userClick: [userID: number, email?: string]
@@ -488,7 +556,7 @@ const showAccountBilling = props.showAccountBilling
 const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 
-const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
+const showIpGeoToolbar = computed(() => !props.telemetry && props.columns.some((col) => col.key === 'ip_address'))
 
 const hasPeakTokenQuotaMultiplier = (row: AdminUsageLog): boolean => {
   if (getDisplayBillingMode(row) !== BILLING_MODE_TOKEN) return false
@@ -550,6 +618,32 @@ const modelAuditTitle = (row: AdminUsageLog): string => [
   `${t('usage.upstreamResponseModel')}: ${row.upstream_response_model || '-'}`,
 ].join('\n')
 
+const telemetryProtocol = (row: AdminUsageLog): string => {
+  const type = resolveUsageRequestType(row)
+  if (type === 'ws_v2' || row.openai_ws_mode) return 'WS'
+  if (type === 'stream' || type === 'live') return 'SSE'
+  return 'HTTP/2'
+}
+
+const formatThroughput = (row: AdminUsageLog): string => {
+  const durationSeconds = Number(row.duration_ms || 0) / 1000
+  if (durationSeconds <= 0) return '0.00'
+  const totalTokens = Number(row.input_tokens || 0) + Number(row.output_tokens || 0)
+  return (totalTokens / durationSeconds).toFixed(2)
+}
+
+const formatTelemetryTime = (value: string | number | Date): string => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date)
+  return `${time}.${String(date.getMilliseconds()).padStart(3, '0')}`
+}
+
 const currentPageIps = computed(() =>
   Array.from(new Set(props.data.map((row) => row.ip_address).filter((ip): ip is string => Boolean(ip))))
 )
@@ -594,6 +688,87 @@ const tokenTooltipVisible = ref(false)
 const tokenTooltipPosition = ref({ x: 0, y: 0 })
 const tokenTooltipData = ref<AdminUsageLog | null>(null)
 
+const TELEMETRY_BASE_COLUMN_KEYS = new Set([
+  'user',
+  'api_key',
+  'account',
+  'model',
+  'reasoning_effort',
+  'endpoint',
+  'stream',
+  'billing_mode',
+  'tokens',
+  'cache_hit_rate',
+  'cost',
+  'latency',
+  'created_at',
+])
+
+const TELEMETRY_COLUMN_MIN_WIDTHS: Record<string, number> = {
+  user: 160,
+  api_key: 180,
+  account: 150,
+  model: 160,
+  reasoning_effort: 105,
+  endpoint: 210,
+  group: 120,
+  stream: 100,
+  billing_mode: 100,
+  tokens: 210,
+  cache_hit_rate: 98,
+  cost: 100,
+  latency: 140,
+  created_at: 135,
+  request_id: 220,
+  upstream_request_id: 220,
+  user_agent: 260,
+  ip_address: 160,
+}
+
+const telemetryReferenceLayout = computed(() =>
+  props.telemetry &&
+  props.columns.length === TELEMETRY_BASE_COLUMN_KEYS.size &&
+  props.columns.every((column) => TELEMETRY_BASE_COLUMN_KEYS.has(column.key))
+)
+
+// Optional audit columns intentionally use the wide ledger. A reduced selection
+// of the standard columns stays compact and left aligned instead of being stretched.
+const telemetryExpanded = computed(() =>
+  props.telemetry && props.columns.some((column) => !TELEMETRY_BASE_COLUMN_KEYS.has(column.key))
+)
+
+const telemetryCompact = computed(() =>
+  props.telemetry && !telemetryReferenceLayout.value && !telemetryExpanded.value
+)
+
+const telemetryLayoutStyle = computed(() => {
+  if (!telemetryCompact.value) return undefined
+
+  const width = props.columns.reduce(
+    (total, column) => total + (TELEMETRY_COLUMN_MIN_WIDTHS[column.key] ?? 140),
+    0
+  )
+
+  return { '--telemetry-layout-width': `${width}px` }
+})
+
+const tokenTooltipTotal = computed(() => {
+  const row = tokenTooltipData.value
+  if (!row) return 0
+  return Number(row.input_tokens || 0)
+    + Number(row.output_tokens || 0)
+    + Number(row.cache_creation_tokens || 0)
+    + Number(row.cache_read_tokens || 0)
+})
+
+const tokenTooltipCacheRatio = computed(() => {
+  if (!tokenTooltipData.value || tokenTooltipTotal.value <= 0) return 0
+  return Math.min(
+    100,
+    Math.max(0, (Number(tokenTooltipData.value.cache_read_tokens || 0) / tokenTooltipTotal.value) * 100)
+  )
+})
+
 const getRequestTypeLabel = (row: AdminUsageLog): string => {
   const requestType = resolveUsageRequestType(row)
   if (requestType === 'cyber') return t('usage.cyber')
@@ -633,9 +808,20 @@ const formatDuration = (ms: number | null | undefined): string => {
 const showTokenTooltip = (event: MouseEvent, row: AdminUsageLog) => {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
+  const popoverWidth = 320
+  const popoverHalfHeight = 190
+  const viewportPadding = 16
+  const rightX = rect.right + 12
+  const leftX = rect.left - popoverWidth - 12
+
   tokenTooltipData.value = row
-  tokenTooltipPosition.value.x = rect.right + 8
-  tokenTooltipPosition.value.y = rect.top + rect.height / 2
+  tokenTooltipPosition.value.x = rightX + popoverWidth <= window.innerWidth - viewportPadding
+    ? rightX
+    : Math.max(viewportPadding, leftX)
+  tokenTooltipPosition.value.y = Math.min(
+    window.innerHeight - popoverHalfHeight,
+    Math.max(popoverHalfHeight, rect.top + rect.height / 2)
+  )
   tokenTooltipVisible.value = true
 }
 

@@ -558,7 +558,8 @@ export default {
       failedToLoadUser: 'Failed to load user info',
       userDeletedBadge: 'Deleted',
       tokenRanking: {
-        subtitle: 'Per-user token usage for the current filters and time range',
+        subtitle: 'Per-user token usage for the selected ranking period and current filters',
+        periods: { label: 'Ranking period', day: 'Daily', week: 'Weekly', custom: 'Custom' },
         rowHint: "Click to view this user's usage details",
         userCount: '{count} users',
         columns: {

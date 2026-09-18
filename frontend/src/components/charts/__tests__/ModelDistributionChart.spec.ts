@@ -198,4 +198,36 @@ describe('ModelDistributionChart', () => {
     expect(rows[3].text()).toContain('400')
     expect(rows[3].text()).toContain('$10.00')
   })
+
+  it('renders the Orbital telemetry matrix with a centered aggregate when enabled', () => {
+    const wrapper = mount(ModelDistributionChart, {
+      props: {
+        modelStats,
+        telemetry: true,
+      },
+      global: {
+        stubs: {
+          LoadingSpinner: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="telemetry-distribution-card"]').classes())
+      .toContain('telemetry-distribution-card--blue')
+    expect(wrapper.get('[data-testid="telemetry-distribution-meta"]').text())
+      .toContain('矩阵 // 01')
+    expect(wrapper.get('[data-testid="telemetry-donut-total"]').text()).toBe('1.50K')
+    expect(wrapper.get('[data-testid="telemetry-donut-active"]').text()).toContain('2')
+
+
+    expect(wrapper.get('[data-testid="telemetry-distribution-accent"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="telemetry-distribution-footer"]')).toBeTruthy()
+    expect(wrapper.findAll('.telemetry-series-swatch').length).toBeGreaterThan(0)
+    const chartData = JSON.parse(wrapper.find('.chart-data').text())
+    expect(chartData.datasets[0].backgroundColor.slice(0, 2)).toEqual(['#1652f0', '#10b981'])
+
+    const options = (wrapper.vm as any).$?.setupState.doughnutOptions
+    expect(options.cutout).toBe('68%')
+  })
+
 })

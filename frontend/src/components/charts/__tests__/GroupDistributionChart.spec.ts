@@ -130,4 +130,29 @@ describe('GroupDistributionChart', () => {
     expect(wrapper.findAll('thead th')).toHaveLength(5)
     expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(5)
   })
+
+  it('renders the green Orbital matrix and centered group aggregate when enabled', () => {
+    const wrapper = mount(GroupDistributionChart, {
+      props: {
+        groupStats,
+        telemetry: true,
+      },
+      global: {
+        stubs: {
+          LoadingSpinner: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="telemetry-distribution-card"]').classes())
+      .toContain('telemetry-distribution-card--emerald')
+    expect(wrapper.get('[data-testid="telemetry-distribution-meta"]').text())
+      .toContain('矩阵 // 02')
+    expect(wrapper.get('[data-testid="telemetry-donut-total"]').text()).toBe('1.80K')
+    expect(wrapper.get('[data-testid="telemetry-donut-active"]').text()).toContain('2')
+    expect(wrapper.get('[data-testid="telemetry-distribution-accent"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="telemetry-distribution-footer"]')).toBeTruthy()
+    expect(wrapper.findAll('.telemetry-series-swatch').length).toBeGreaterThan(0)
+  })
+
 })

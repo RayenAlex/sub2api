@@ -555,7 +555,8 @@ export default {
       failedToLoadUser: '加载用户信息失败',
       userDeletedBadge: '已删除',
       tokenRanking: {
-        subtitle: '按当前筛选与时间范围统计每个用户的 Token 用量',
+        subtitle: '按当前筛选条件与排行榜周期统计每个用户的 Token 用量',
+        periods: { label: '排行榜周期', day: '日榜', week: '周榜', custom: '自定义' },
         rowHint: '点击查看该用户的用量明细',
         userCount: '共 {count} 位用户',
         columns: {

@@ -26,15 +26,17 @@
     <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
       <!-- Desktop pagination info -->
       <div class="flex items-center space-x-4">
-        <p class="text-sm text-gray-700 dark:text-gray-300">
-          {{ t('pagination.showing') }}
-          <span class="font-medium">{{ fromItem }}</span>
-          {{ t('pagination.to') }}
-          <span class="font-medium">{{ toItem }}</span>
-          {{ t('pagination.of') }}
-          <span class="font-medium">{{ total }}</span>
-          {{ t('pagination.results') }}
-        </p>
+        <slot name="info" :from="fromItem" :to="toItem" :total="total">
+          <p class="text-sm text-gray-700 dark:text-gray-300">
+            {{ t('pagination.showing') }}
+            <span class="font-medium">{{ fromItem }}</span>
+            {{ t('pagination.to') }}
+            <span class="font-medium">{{ toItem }}</span>
+            {{ t('pagination.of') }}
+            <span class="font-medium">{{ total }}</span>
+            {{ t('pagination.results') }}
+          </p>
+        </slot>
 
         <!-- Page size selector -->
         <div v-if="showPageSizeSelector" class="flex items-center space-x-2">

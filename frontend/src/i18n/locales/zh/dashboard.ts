@@ -469,6 +469,9 @@ export default {
       detailAccuracy: '定位精度',
       detailCoordinates: '坐标',
     },
+    liveSync: '实时同步',
+    telemetryRecordCount: '共 {count} 条遥测记录',
+    telemetryPagination: '显示第 {from} 至 {to} 条，共 {total} 条遥测记录',
     tabs: { usage: '用量明细', errors: '错误请求', ranking: '用户排行' },
     errors: {
       time: '时间', model: '模型', endpoint: '端点', status: '状态码',

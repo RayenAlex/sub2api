@@ -177,6 +177,7 @@ describe('admin UsageTable tooltip', () => {
     const rates = wrapper.findAll('[data-testid="cache-hit-rate"]')
     expect(rates).toHaveLength(2)
     expect(rates[0].text()).toContain('80.0%')
+    expect(rates[0].classes()).toContain('items-center')
     expect(rates[1].text()).toBe('-')
   })
 
@@ -769,4 +770,240 @@ describe('admin UsageTable deleted-user badge', () => {
     expect(wrapper.text()).not.toContain('Deleted')
     expect(wrapper.text()).toContain('active@test.com')
   })
+
+  it('forwards the telemetry ledger variant to the shared data table', () => {
+    const DataTableVariantStub = {
+      props: ['variant'],
+      template: '<div data-testid="data-table-variant" :data-variant="variant" />',
+    }
+
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [],
+        loading: false,
+        columns: [],
+        telemetry: true,
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableVariantStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="data-table-variant"]').attributes('data-variant'))
+      .toBe('telemetry')
+  })
+
+})
+
+describe('admin UsageTable telemetry ledger cells', () => {
+  it('renders the reference protocol, token throughput, latency, and time/source composites', () => {
+    const TelemetryCellsStub = {
+      props: ['data', 'variant'],
+      template: `
+        <div :data-variant="variant">
+          <div v-for="row in data" :key="row.request_id">
+            <slot name="cell-user" :row="row" />
+            <slot name="cell-model" :row="row" />
+            <slot name="cell-reasoning_effort" :row="row" />
+            <slot name="cell-endpoint" :row="row" />
+            <slot name="cell-stream" :row="row" />
+            <slot name="cell-billing_mode" :row="row" />
+            <slot name="cell-tokens" :row="row" />
+            <slot name="cell-cache_hit_rate" :row="row" />
+            <slot name="cell-cost" :row="row" />
+            <slot name="cell-latency" :row="row" />
+            <slot name="cell-created_at" :row="row" :value="row.created_at" />
+          </div>
+        </div>
+      `,
+    }
+
+    const wrapper = mount(UsageTable, {
+      props: {
+        telemetry: true,
+        loading: false,
+        columns: [],
+        data: [{
+          request_id: 'req-ledger-1',
+          user_id: 1,
+          user: { id: 1, email: 'admin@sub2api.local' },
+          model: 'gpt-5.6-terra',
+          reasoning_effort: 'high',
+          inbound_endpoint: '/v1/responses',
+          upstream_endpoint: '/v1/responses',
+          request_type: 'ws_v2',
+          billing_mode: 'token',
+          input_tokens: 1427,
+          output_tokens: 105,
+          cache_read_tokens: 80100,
+          cache_creation_tokens: 0,
+          cache_creation_5m_tokens: 0,
+          cache_creation_1h_tokens: 0,
+          cache_ttl_overridden: false,
+          actual_cost: 0.02014,
+          total_cost: 0.02014,
+          duration_ms: 6990,
+          first_token_ms: 4710,
+          created_at: '2026-09-18T14:32:08.410Z',
+          ip_address: '104.28.192.12',
+        }],
+      },
+      global: {
+        stubs: {
+          DataTable: TelemetryCellsStub,
+          EmptyState: true,
+          Icon: true,
+          IpGeoCell: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="telemetry-protocol"]').text()).toBe('WS')
+    expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('IN1,427')
+    expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('OUT105')
+    expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('80.1KKV CACHE')
+    expect(wrapper.get('[data-testid="telemetry-latency"]').text()).toContain('4.71s / 6.99s')
+    expect(wrapper.get('[data-testid="telemetry-time-source"]').text()).toContain(':32:08.410')
+    expect(wrapper.get('[data-testid="telemetry-time-source"]').text()).toContain('104.28.192.12')
+  })
+})
+
+describe('admin UsageTable telemetry expanded layout and token breakdown', () => {
+  it('switches to stable wide-table mode when optional columns are visible', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        telemetry: true,
+        loading: false,
+        data: [],
+        columns: [
+          { key: 'user', label: 'User' },
+          { key: 'tokens', label: 'Tokens' },
+          { key: 'request_id', label: 'Request ID' },
+        ],
+      },
+      global: {
+        stubs: {
+          DataTable: true,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('.telemetry-usage-table').classes()).toContain('telemetry-usage-table--expanded')
+  })
+
+  it('keeps reduced column selections dense instead of distributing empty gaps', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        telemetry: true,
+        loading: false,
+        data: [],
+        columns: [
+          { key: 'user', label: 'User' },
+          { key: 'api_key', label: 'API Key' },
+          { key: 'account', label: 'Account' },
+          { key: 'model', label: 'Model' },
+          { key: 'reasoning_effort', label: 'Reasoning' },
+          { key: 'endpoint', label: 'Endpoint' },
+          { key: 'tokens', label: 'Tokens' },
+        ],
+      },
+      global: {
+        stubs: {
+          DataTable: true,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const table = wrapper.get('.telemetry-usage-table')
+    expect(table.classes()).toContain('telemetry-usage-table--compact')
+    expect(table.attributes('style')).toContain('--telemetry-layout-width: 1175px')
+  })
+
+  it('renders the design-system token breakdown popover', async () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        telemetry: true,
+        loading: false,
+        columns: [{ key: 'tokens', label: 'Tokens' }],
+        data: [{
+          ...baseImageRow,
+          request_id: 'req-token-breakdown',
+          billing_mode: 'token',
+          input_tokens: 900,
+          output_tokens: 220,
+          cache_creation_tokens: 320,
+          cache_read_tokens: 540,
+        }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await wrapper.get('[data-testid="telemetry-token-throughput"]').trigger('mouseenter')
+
+    const popover = wrapper.get('[data-testid="telemetry-token-breakdown"]')
+    expect(popover.text()).toContain('TOKEN BREAKDOWN')
+    expect(popover.text()).toContain('REALTIME')
+    expect(popover.text()).toContain('Input (Prompt)900')
+    expect(popover.text()).toContain('Output (Completion)220')
+    expect(popover.text()).toContain('Cache Read540')
+    expect(popover.text()).toContain('TOTAL TOKENS1,980')
+    expect(popover.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('27.3')
+  })
+
+  it('keeps image-token splits in the redesigned breakdown popover', async () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        telemetry: true,
+        loading: false,
+        columns: [{ key: 'tokens', label: 'Tokens' }],
+        data: [{
+          ...baseImageRow,
+          request_id: 'req-image-token-breakdown',
+          billing_mode: 'token',
+          input_tokens: 100,
+          image_input_tokens: 80,
+          output_tokens: 50,
+          image_output_tokens: 40,
+          cache_creation_tokens: 0,
+          cache_read_tokens: 0,
+        }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await wrapper.get('[data-testid="telemetry-token-throughput"]').trigger('mouseenter')
+
+    const popover = wrapper.get('[data-testid="telemetry-token-breakdown"]')
+    expect(popover.text()).toContain('Text Input (Prompt)20')
+    expect(popover.text()).toContain('Image Input80')
+    expect(popover.text()).toContain('Text Output (Completion)10')
+    expect(popover.text()).toContain('Image Output40')
+  })
+
 })
