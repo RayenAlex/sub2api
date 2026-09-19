@@ -14,6 +14,166 @@ export default {
     login: '登录',
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
+ design: {
+  nav: {
+   models: '模型矩阵',
+   architecture: '核心架构',
+   telemetry: '实时遥测',
+   pricing: '透明计费',
+   docs: '接入文档'
+  },
+  hero: {
+   eyebrow: 'Subscription to API Conversion Platform',
+   status: '全协议高可用聚合',
+   title: '算力统一调度，<br class="hidden sm:inline">如电力般触手可及。',
+   description: '一键将多源订阅转化为标准 OpenAI & Anthropic 格式 API。智能调度集群账号，毫秒级故障旁路切换，为生产级 AI 原生应用而生。',
+   primary: '立即进入控制台',
+   secondary: '探索模型矩阵',
+   terminalTitle: 'terminal · anycast-gateway-shanghai',
+   terminalProtocol: 'PROTOCOL: HTTP/2 (Multiplexed)',
+   terminalActive: 'ACTIVE: 100%',
+   terminalRequest: 'POST https://api.sub2.org/v1/chat/completions',
+   terminalKey: 'sk-sub2-live-production',
+   terminalBody: 'application/json',
+   terminalPayload: 'model: \"claude-3-7-sonnet\"',
+   terminalRouting: '# Routing to upstream: cluster-us-west-4 (Fallback Pool: Ready)',
+   terminalSuccess: '200 OK',
+   terminalResult: 'content: \"Hello!\"',
+   terminalStream: '算力已实时调度完成。首字响应延迟 118ms。',
+   terminalTelemetry: {
+    latency: {
+     label: '平均首字延迟',
+     value: '118 ms',
+     note: '全球 Anycast 加速'
+    },
+    healing: {
+     label: '多账号自愈成功率',
+     value: '99.99 %',
+     note: '0 频发频控中断'
+    },
+    overhead: {
+     label: '协议转换损耗',
+     value: '< 1.2 ms',
+     note: '零内存拷贝引擎'
+    },
+    affinity: {
+     label: '会话粘性保持',
+     value: '100 %',
+     note: '智能上下文感知'
+    }
+   }
+  },
+  quickSpecs: {
+   automated: '订阅转 API 全自动化',
+   context: '原生会话上下文保持',
+   billing: '精确按量计费与配额控制',
+   sdk: 'OpenAI & Anthropic 官方 SDK 即插即用'
+  },
+   models: {
+    eyebrow: 'The Lineup',
+    title: '探索全系模型矩阵。',
+    description: '一个通用 API 密钥，无缝调度顶尖主流基础大模型与前沿推理体系。',
+    official: '官方全量支持',
+    guide: '接入指南 >',
+    cards: {
+     llama: {
+      badge: '高并发开源集群',
+      name: 'Llama 3.3 / Mistral',
+      vendor: 'Meta & Mistral · 70B 开源基准',
+      description: '极度轻量且精准的泛化开源生态支撑，全球多机房 Anycast 加速部署，高并发海量任务稳定吞吐。',
+      note: '低成本极速并发'
+     },
+     claude: {
+      badge: '官方全量支持',
+      name: 'Claude 3.7 / 3.5',
+      vendor: 'Anthropic · Sonnet / Opus',
+      description: '极致的代码逻辑重构与深层语义推理。支持超长思考链 (Extended Thinking) 与 200K 上下文极速输出。',
+      note: '流式低至 130ms'
+     },
+     gpt: {
+      badge: '官方全量支持',
+      name: 'GPT-4.5 / o3-mini',
+      vendor: 'OpenAI · Reasoning & Flagship',
+      description: '旗舰级多模态分析、高难数学物理自验证，兼容 Function Calling 与原生 JSON Mode 严谨约束。',
+      note: '高并发并发队列'
+     },
+     gemini: {
+      badge: '官方全量支持',
+      name: 'Gemini 2.5 Pro / Flash',
+      vendor: 'Google DeepMind · 1M+ Context',
+      description: '百万级超长上下文窗口无衰减检索，全模态音画原生理解，超快生成响应与极限成本优势。',
+      note: '首字响应极速'
+     },
+     deepseek: {
+      badge: '集群直通接入',
+      name: 'DeepSeek R1 / V3',
+      vendor: 'DeepSeek Architecture · 满血版',
+      description: '671B 满血 MoE 架构直连，深度长思维链思维展示。低时延无限制并发吞吐调度。',
+      note: '满血架构无阉割'
+     }
+    }
+   },
+  capabilities: {
+   eyebrow: 'CORE CAPABILITIES',
+   title: '工程至上。第一性原理设计。',
+   description: '摒弃传统中转平台的臃肿链路，打造专为高并发生产环境定制的算力枢纽。',
+   cards: {
+    access: {
+     title: '01. 极简一键接入',
+     description: '仅需一个统一 Master Key，即可调配全量已接入的全球 AI 模型。完全免除在十余家模型供应商间重复申请企业实名与复杂的信用卡绑卡流程。',
+     note: '零学习成本 · 100% 官方协议兼容'
+    },
+    resilience: {
+     title: '02. 自适应弹性自愈',
+     description: '自研全局健康度感应探针。毫秒级智能调度多个上游发放账号，自动在速率限制出现时完成零感知静默重试与无缝故障旁路切换。',
+     note: '99.99% 可用性 · 告别频繁报错'
+    },
+    billing: {
+     title: '03. 透明微量计费',
+     description: '完全摒弃保底会员月租机制。按实际流式生成的 Prompt 与 Completion Token 精确扣费，支持企业级多成员硬性配额上限保护。',
+     note: '无任何闲置损耗 · 用多少付多少'
+    }
+   }
+  },
+  telemetry: {
+   eyebrow: '实时系统运行指标',
+   title: '全球边缘集群遥测状态',
+   description: '基于 Anycast 分布式节点全天候监控，数据每 10 秒全局同步刷新。',
+   metrics: {
+    requests: { value: '14.8M+', label: '今日完成调度请求 (REQUESTS)' },
+    availability: { value: '99.98%', label: '30 天全链路可用率' },
+    latency: { value: '42 ms', label: '亚太核心网内延迟' },
+    price: { value: '0.00 ¥', label: '公益起步费用门槛' }
+   }
+  },
+  pricing: {
+   eyebrow: 'TRANSPARENT BILLING',
+   title: '透明的微量计费。',
+   description: '按实际输入与输出用量计费，没有月租、没有闲置损耗，为个人开发者和团队提供可预期的成本控制。',
+   inputLabel: '输入 Token',
+   outputLabel: '输出 Token',
+   cacheLabel: '缓存命中',
+   value: '按量计费'
+  },
+  docs: {
+   eyebrow: 'DEVELOPER DOCS',
+   title: '标准 API，快速接入。',
+   description: '使用熟悉的 OpenAI 与 Anthropic API 格式，在几分钟内将现有应用切换到高可用算力分发网络。',
+   action: '查看开发者接入指南'
+  },
+  cta: {
+   title: '立即接入下一代算力分发网络。',
+   description: '只需 30 秒注册，立即获取高可用测试额度与标准 API 终端网关地址。',
+   primary: '免费注册并进入控制台',
+   docs: '查看开发者接入指南'
+  },
+  footer: {
+   status: '系统状态',
+   privacy: '隐私声明',
+   terms: '服务条款',
+   github: 'GitHub 仓库'
+  }
+ },
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，畅用多个 AI 模型',
     heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',

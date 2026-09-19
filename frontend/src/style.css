@@ -4305,3 +4305,59 @@ body {
 .telemetry-trend-metrics {
   width: 100%;
 }
+
+/* ==========================================================================
+   Apple-style Scroll Transition System (iPhone Duo Inspired)
+   ========================================================================== */
+
+.reveal-fade-up,
+.reveal-pop {
+  will-change: opacity, transform;
+}
+
+/* Guard initial hidden states under .reveal-ready (added on client mount)
+   This prevents flash-of-invisible-content (FOIC) during SSR or before JS hydration. */
+.reveal-ready .reveal-fade-up:not(.is-revealed) {
+  opacity: 0;
+  transform: translateY(32px);
+  pointer-events: none;
+}
+
+.reveal-ready .reveal-pop:not(.is-revealed) {
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+}
+
+/* Smooth deceleration transition timing curves matching Apple's reverse-engineered specs */
+.reveal-ready .reveal-fade-up {
+  transition: opacity 0.8s cubic-bezier(0.33, 1, 0.68, 1),
+              transform 0.8s cubic-bezier(0.33, 1, 0.68, 1);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+.reveal-ready .reveal-pop {
+  transition: opacity 0.7s cubic-bezier(0.33, 1, 0.68, 1),
+              transform 0.75s cubic-bezier(0.3, 2, 0.5, 1);
+  transition-delay: calc(var(--i, 0) * 80ms);
+}
+
+.reveal-ready .reveal-fade-up.is-revealed,
+.reveal-ready .reveal-pop.is-revealed {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Three-tier prefers-reduced-motion fallback */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-ready .reveal-fade-up,
+  .reveal-ready .reveal-pop,
+  .reveal-ready .reveal-fade-up:not(.is-revealed),
+  .reveal-ready .reveal-pop:not(.is-revealed) {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    pointer-events: auto !important;
+  }
+}
