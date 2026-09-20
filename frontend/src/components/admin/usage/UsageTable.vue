@@ -635,10 +635,21 @@ const telemetryProtocol = (row: AdminUsageLog): string => {
 }
 
 const formatThroughput = (row: AdminUsageLog): string => {
-  const durationSeconds = Number(row.duration_ms || 0) / 1000
-  if (durationSeconds <= 0) return '0.00'
-  const totalTokens = Number(row.input_tokens || 0) + Number(row.output_tokens || 0)
-  return (totalTokens / durationSeconds).toFixed(2)
+  const durationMs = Number(row.duration_ms || 0)
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return '0.00'
+
+  // Generation speed must use output tokens only. Prompt tokens are processed
+  // before generation and must not inflate the displayed tok/s value. For
+  // streaming requests, exclude TTFT so the denominator represents the actual
+  // token-generation window; fall back to total duration when TTFT is absent
+  // or invalid.
+  const firstTokenMs = Number(row.first_token_ms)
+  const generationDurationMs = Number.isFinite(firstTokenMs) && firstTokenMs >= 0 && firstTokenMs < durationMs
+    ? durationMs - firstTokenMs
+    : durationMs
+  const outputTokens = Math.max(0, Number(row.output_tokens) || 0)
+  if (generationDurationMs <= 0) return '0.00'
+  return (outputTokens / (generationDurationMs / 1000)).toFixed(2)
 }
 
 const formatTelemetryTime = (value: string | number | Date): string => {

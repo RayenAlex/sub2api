@@ -872,6 +872,7 @@ describe('admin UsageTable telemetry ledger cells', () => {
     expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('OUT105')
     expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('80.1KKV CACHE')
     expect(wrapper.get('[data-testid="telemetry-latency"]').text()).toContain('4.71s / 6.99s')
+    expect(wrapper.get('[data-testid="telemetry-latency"]').text()).toContain('46.05 tok/s')
     expect(wrapper.get('[data-testid="telemetry-time-source"]').text()).toContain(':32:08.410')
     expect(wrapper.get('[data-testid="telemetry-time-source"]').text()).toContain('104.28.192.12')
   })
