@@ -73,7 +73,16 @@
         </template>
 
         <template #cell-model="{ row }">
-          <span v-if="telemetry" class="telemetry-ledger-primary-text whitespace-nowrap">{{ row.model || '-' }}</span>
+          <div v-if="telemetry" class="telemetry-model-audit" :title="modelAuditTitle(row)">
+            <span class="telemetry-ledger-primary-text telemetry-model-audit__requested">{{ row.model || '-' }}</span>
+            <span v-if="sentUpstreamModel(row) && sentUpstreamModel(row) !== row.model" class="telemetry-model-audit__upstream">
+              <span aria-hidden="true">↳</span>{{ sentUpstreamModel(row) }}
+            </span>
+            <span v-if="row.upstream_response_model && row.upstream_response_model !== sentUpstreamModel(row)" class="telemetry-model-audit__response">
+              <span aria-hidden="true">↳</span>{{ row.upstream_response_model }}
+              <span class="telemetry-model-audit__response-label">{{ t('usage.upstreamResponseModel') }}</span>
+            </span>
+          </div>
           <div v-else class="space-y-0.5 text-xs">
             <div v-if="row.model_mapping_chain && row.model_mapping_chain.includes('→')" class="space-y-0.5">
               <div v-for="(step, i) in row.model_mapping_chain.split('→')" :key="i"

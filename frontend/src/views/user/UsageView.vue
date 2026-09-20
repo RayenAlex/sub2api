@@ -228,6 +228,7 @@
 
         <div v-if="activeTab === 'usage'" class="telemetry-ledger-body">
           <UsageTable
+            class="telemetry-usage-table--fluid"
             flat
             telemetry
             :data="usageLogs"

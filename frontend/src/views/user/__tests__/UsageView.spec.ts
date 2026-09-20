@@ -582,6 +582,7 @@ describe('user UsageView telemetry shell', () => {
 
     const table = wrapper.findComponent(UsageTable)
     expect(table.props('telemetry')).toBe(true)
+    expect(table.classes()).toContain('telemetry-usage-table--fluid')
     expect(table.props('flat')).toBe(true)
     expect(table.props('showAccountBilling')).toBe(false)
     expect(table.props('showUpstreamEndpoint')).toBe(false)

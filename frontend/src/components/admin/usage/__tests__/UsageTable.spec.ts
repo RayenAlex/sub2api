@@ -832,7 +832,7 @@ describe('admin UsageTable telemetry ledger cells', () => {
           request_id: 'req-ledger-1',
           user_id: 1,
           user: { id: 1, email: 'admin@sub2api.local' },
-          model: 'gpt-5.6-terra',
+          model: 'gpt-5.6-terra', upstream_model: 'gpt-5.6-sol', upstream_response_model: 'gpt-5.5',
           reasoning_effort: 'high',
           inbound_endpoint: '/v1/responses',
           upstream_endpoint: '/v1/responses',
@@ -864,6 +864,9 @@ describe('admin UsageTable telemetry ledger cells', () => {
       },
     })
 
+    expect(wrapper.get('.telemetry-model-audit').text()).toContain('gpt-5.6-terra')
+    expect(wrapper.get('.telemetry-model-audit').text()).toContain('gpt-5.6-sol')
+    expect(wrapper.get('.telemetry-model-audit').text()).toContain('gpt-5.5')
     expect(wrapper.get('[data-testid="telemetry-protocol"]').text()).toBe('WS')
     expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('IN1,427')
     expect(wrapper.get('[data-testid="telemetry-token-throughput"]').text()).toContain('OUT105')

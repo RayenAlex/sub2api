@@ -2471,6 +2471,38 @@ body {
   white-space: normal;
 }
 
+.telemetry-model-audit {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.14rem;
+  line-height: 1.35;
+}
+
+.telemetry-model-audit__requested,
+.telemetry-model-audit__upstream,
+.telemetry-model-audit__response {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telemetry-model-audit__upstream,
+.telemetry-model-audit__response {
+  color: var(--orbital-muted);
+  font-size: 0.68rem;
+}
+
+.telemetry-model-audit__response {
+  color: #b45309;
+}
+
+.telemetry-model-audit__response-label {
+  margin-left: 0.25rem;
+  font-size: 0.58rem;
+  opacity: 0.85;
+}
+
 .telemetry-reasoning-pill,
 .telemetry-billing-pill {
   display: inline-flex;
@@ -3300,6 +3332,33 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The account ledger has fewer columns than the admin reference layout.
+ * Fill its panel instead of capping it at the compact column-width sum.
+ * Auto layout respects content widths; narrow viewports keep horizontal scrolling.
+ */
+.telemetry-usage-table--fluid .data-table--telemetry table {
+  width: 100% !important;
+  min-width: var(--telemetry-layout-width, 1100px) !important;
+  max-width: none;
+  table-layout: auto;
+}
+
+.telemetry-usage-table--fluid .data-table--telemetry [data-column-key='latency'],
+.telemetry-usage-table--fluid .data-table--telemetry [data-column-key='created_at'] {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.telemetry-usage-table--fluid .data-table--telemetry th[data-column-key='latency'] > div,
+.telemetry-usage-table--fluid .data-table--telemetry th[data-column-key='created_at'] > div,
+.telemetry-usage-table--fluid .data-table--telemetry th[data-column-key='cost'] > div {
+  justify-content: flex-end;
+}
+
+.telemetry-usage-table--fluid .data-table--telemetry th[data-column-key='cache_hit_rate'] > div {
+  justify-content: center;
 }
 
 /* Reference-style control sidebar: one recessed rail containing a single mission card. */

@@ -47,3 +47,25 @@ describe('Orbital telemetry UI framework', () => {
     expect(tailwindSource).toContain('telemetry: {')
   })
 })
+
+
+describe('account usage ledger layout', () => {
+  it('fills the panel without capping the table at the compact width', () => {
+    const rule = globalStyleSource.match(
+      /\.telemetry-usage-table--fluid \.data-table--telemetry table\s*\{([^}]+)\}/
+    )?.[1]
+    expect(rule).toBeDefined()
+    expect(rule).toContain('width: 100% !important')
+    expect(rule).toContain('min-width: var(--telemetry-layout-width, 1100px) !important')
+    expect(rule).toContain('max-width: none')
+    expect(rule).toContain('table-layout: auto')
+  })
+
+  it('keeps duration and time values unwrapped in the fluid account ledger', () => {
+    const rule = globalStyleSource.match(
+      /\.telemetry-usage-table--fluid \.data-table--telemetry \[data-column-key='latency'\],[^{]+\{([^}]+)\}/
+    )?.[1]
+    expect(rule).toContain('white-space: nowrap')
+    expect(rule).toContain('text-align: right')
+  })
+})
