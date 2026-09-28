@@ -621,7 +621,8 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 		{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
 	}
 	normalized := getNormalizedCodexModel(modelID)
-	if isOpenAIGPT56Model(modelID) || isOpenAIGPT6AstraModel(modelID) {
+	gpt6Model := canonicalizeOpenAIModelAliasSpelling(modelID)
+	if isOpenAIGPT56Model(modelID) || gpt6Model == "gpt-6" || strings.HasPrefix(gpt6Model, "gpt-6-") {
 		levels = append(levels, configuredCodexReasoningLevel{
 			Effort:      "max",
 			Description: "Maximum reasoning depth for complex tasks",
@@ -632,6 +633,16 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 			Effort:      "ultra",
 			Description: "Maximum reasoning with automatic task delegation",
 		})
+	}
+	// Sol and Luna support disabling reasoning; Astra instead offers Ultra.
+	for _, model := range []string{"gpt-6-sol", "gpt-6-luna"} {
+		if gpt6Model == model || strings.HasPrefix(gpt6Model, model+"-") {
+			levels = append(levels, configuredCodexReasoningLevel{
+				Effort:      "none",
+				Description: "Disable reasoning",
+			})
+			break
+		}
 	}
 	return levels
 }
@@ -646,7 +657,7 @@ func isOpenAICodexGPTModel(modelID string) bool {
 
 func isOpenAICodexReasoningGPTModel(modelID string) bool {
 	normalized := canonicalizeOpenAIModelAliasSpelling(modelID)
-	return isOpenAIGPT6AstraModel(normalized) || strings.HasPrefix(normalized, "gpt-5")
+	return normalized == "gpt-6" || strings.HasPrefix(normalized, "gpt-6-") || strings.HasPrefix(normalized, "gpt-5")
 }
 
 func isOpenAICodexImageInputModel(modelID string) bool {
