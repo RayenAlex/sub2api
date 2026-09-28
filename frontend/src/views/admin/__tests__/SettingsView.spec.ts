@@ -559,6 +559,7 @@ function mountView() {
         ProxySelector: true,
         ImageUpload: ImageUploadStub,
         BackupSettings: true,
+        CodexModelReasoningSettings: true,
       },
     },
   });
@@ -623,6 +624,34 @@ describe("admin SettingsView email domain quota copy", () => {
     expect(zhQuotaHint).toContain("关闭时非白名单域名直接拒绝");
     expect(enQuotaHint).toContain("one account");
     expect(enQuotaHint).toContain("When disabled");
+  });
+});
+
+describe("Codex model reasoning tab isolation", () => {
+  it("shows its own tab and hides the general settings save button", async () => {
+    getSettings.mockResolvedValue({ ...baseSettingsResponse });
+    getWebSearchEmulationConfig.mockResolvedValue({ enabled: false, providers: [] });
+    getAdminApiKey.mockResolvedValue({ exists: false, masked_key: "" });
+    getOverloadCooldownSettings.mockResolvedValue({ enabled: false, cooldown_minutes: 10 });
+    getRateLimit429CooldownSettings.mockResolvedValue({ enabled: false, cooldown_seconds: 5 });
+    getStreamTimeoutSettings.mockResolvedValue({ enabled: false });
+    getRectifierSettings.mockResolvedValue({ enabled: false });
+    getBetaPolicySettings.mockResolvedValue({ rules: [] });
+    getGroups.mockResolvedValue([]);
+    listProxies.mockResolvedValue({ items: [] });
+    getProviders.mockResolvedValue({ data: [] });
+    const wrapper = mountView();
+    await flushPromises();
+    const tab = wrapper.get('#settings-tab-codexModelReasoning');
+    expect(wrapper.find('codex-model-reasoning-settings-stub').exists()).toBe(false);
+    await tab.trigger('click');
+    expect(tab.attributes('aria-selected')).toBe('true');
+    expect(wrapper.get('codex-model-reasoning-settings-stub').isVisible()).toBe(true);
+    expect(wrapper.get('button[type="submit"]').isVisible()).toBe(false);
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 });
 

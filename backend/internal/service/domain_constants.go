@@ -701,6 +701,7 @@ const (
 	// 空值表示跟随自动同步值；自动同步也没有结果时回退到内置常量。
 	// 上游在容量紧张时按客户端身份分优先级降载，陈旧版本会被优先丢弃，故该值需保持跟随官方发布。
 	SettingKeyOpenAICodexClientVersion = "openai_codex_client_version"
+	SettingKeyCodexModelReasoningRules = "codex_model_reasoning_rules"
 	// SettingKeyOpenAICodexClientVersionSynced 自动同步任务写入的官方 Codex 最新稳定版版本号。
 	// 由 OpenAICodexVersionSyncService 独占写入，面板只读展示；管理员覆写请用
 	// SettingKeyOpenAICodexClientVersion。

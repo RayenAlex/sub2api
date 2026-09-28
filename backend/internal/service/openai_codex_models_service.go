@@ -145,6 +145,7 @@ func (s *OpenAIGatewayService) BuildGroupConfiguredCodexModelsManifest(
 		group,
 		nil,
 		true,
+		s.settingService.CodexModelReasoningRulesForManifest(ctx),
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("initialize group configured Codex models: %w", err)
@@ -199,6 +200,7 @@ func (s *OpenAIGatewayService) MergeGroupConfiguredCodexModels(
 		configuredModels,
 		group.ModelAllowlist.Models,
 		group.ModelAllowlistEnabled(),
+		s.settingService.CodexModelReasoningRulesForManifest(ctx),
 	)
 	if err != nil {
 		return fmt.Errorf("merge group configured Codex models: %w", err)
@@ -815,20 +817,24 @@ func (s *GatewayService) BuildCodexModelsManifestForGroup(
 	platformOverride string,
 	modelIDs []string,
 ) ([]byte, error) {
-	if s == nil || s.accountRepo == nil || group == nil {
+	if s == nil || group == nil {
 		return BuildCodexModelsManifest(modelIDs)
+	}
+	rules := s.settingService.CodexModelReasoningRulesForManifest(ctx)
+	if s.accountRepo == nil {
+		return buildCodexModelsManifest(modelIDs, nil, nil, nil, nil, rules)
 	}
 	effectivePlatform := strings.TrimSpace(platformOverride)
 	if effectivePlatform == "" {
 		effectivePlatform = group.Platform
 	}
 	if effectivePlatform != PlatformComposite && !isConcreteRequestPlatform(effectivePlatform) {
-		return BuildCodexModelsManifest(modelIDs)
+		return buildCodexModelsManifest(modelIDs, nil, nil, nil, nil, rules)
 	}
 
 	_, catalog, err := loadCodexGroupCatalogAccounts(ctx, s.accountRepo, group.ID)
 	if err != nil {
-		return BuildCodexModelsManifest(modelIDs)
+		return buildCodexModelsManifest(modelIDs, nil, nil, nil, nil, rules)
 	}
 	var compositeRoutes []CompositeModelRoute
 	compositeRoutesAvailable := true
@@ -845,6 +851,7 @@ func (s *GatewayService) BuildCodexModelsManifestForGroup(
 		group,
 		compositeRoutes,
 		compositeRoutesAvailable,
+		rules,
 	)
 }
 
@@ -855,6 +862,7 @@ func buildCodexModelsManifestForAccounts(
 	group *Group,
 	compositeRoutes []CompositeModelRoute,
 	compositeRoutesAvailable bool,
+	configuredRules ...[]CodexModelReasoningRule,
 ) ([]byte, error) {
 	imageInputModels := make(map[string]bool, len(modelIDs))
 	searchToolModels := make(map[string]bool, len(modelIDs))
@@ -897,7 +905,7 @@ func buildCodexModelsManifestForAccounts(
 			modelMetadata[modelID] = metadata
 		}
 	}
-	return buildCodexModelsManifest(modelIDs, imageInputModels, searchToolModels, metadataModels, modelMetadata)
+	return buildCodexModelsManifest(modelIDs, imageInputModels, searchToolModels, metadataModels, modelMetadata, configuredRules...)
 }
 
 func buildCodexModelsManifest(
@@ -906,7 +914,12 @@ func buildCodexModelsManifest(
 	searchToolModels map[string]bool,
 	metadataModels map[string]string,
 	modelMetadata map[string]codexModelMetadataOverride,
+	configuredRules ...[]CodexModelReasoningRule,
 ) ([]byte, error) {
+	var rules []CodexModelReasoningRule
+	if len(configuredRules) > 0 {
+		rules = configuredRules[0]
+	}
 	seen := make(map[string]struct{}, len(modelIDs))
 	models := make([]json.RawMessage, 0, len(modelIDs))
 	for _, modelID := range modelIDs {
@@ -928,8 +941,16 @@ func buildCodexModelsManifest(
 		descriptor := newConfiguredCodexModelDescriptor(metadataModelID)
 		descriptor.Slug = modelID
 		descriptor.SupportsSearchTool = searchToolModels[modelID]
-		if metadata, ok := modelMetadata[modelID]; ok {
+		metadata, hasMetadata := modelMetadata[modelID]
+		if hasMetadata {
 			applyUpstreamModelMetadataToCodexDescriptor(&descriptor, metadata)
+		}
+		if rule, ok := findCodexModelReasoningRule(rules, modelID); ok {
+			if hasMetadata {
+				applyCodexModelReasoningRule(&descriptor, rule, &metadata)
+			} else {
+				applyCodexModelReasoningRule(&descriptor, rule, nil)
+			}
 		}
 		if imageInputModels[modelID] {
 			// Apply the capability-derived modality after upstream metadata so
@@ -1307,7 +1328,12 @@ func mergeConfiguredCodexModelsManifest(
 	configuredModels []string,
 	selectedModels []string,
 	filterBySelection bool,
+	configuredRules ...[]CodexModelReasoningRule,
 ) ([]byte, bool, error) {
+	var rules []CodexModelReasoningRule
+	if len(configuredRules) > 0 {
+		rules = configuredRules[0]
+	}
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return nil, false, err
@@ -1383,7 +1409,11 @@ func mergeConfiguredCodexModelsManifest(
 		if _, exists := seen[modelID]; exists {
 			continue
 		}
-		rawModel, err := json.Marshal(newConfiguredCodexModelDescriptor(modelID))
+		descriptor := newConfiguredCodexModelDescriptor(modelID)
+		if rule, ok := findCodexModelReasoningRule(rules, modelID); ok {
+			applyCodexModelReasoningRule(&descriptor, rule, nil)
+		}
+		rawModel, err := json.Marshal(descriptor)
 		if err != nil {
 			return nil, false, err
 		}
@@ -2134,9 +2164,26 @@ func convertOpenAIModelListToCodexManifestForAccount(body []byte, account *Accou
 		metadataModels[id] = capabilityModel
 		capabilities := accountCodexToolCapabilities(account, capabilityModel)
 		applyCodexToolCapabilities(capabilities, entry, true)
-		modelMetadata[id] = codexModelMetadataOverride{UpstreamModelMetadata: UpstreamModelMetadata{
+		metadata := codexModelMetadataOverride{UpstreamModelMetadata: UpstreamModelMetadata{
 			CodexToolCapabilities: capabilities,
 		}}
+		if raw, ok := entry["reasoning"]; ok {
+			var reasoning bool
+			if json.Unmarshal(raw, &reasoning) == nil {
+				metadata.Reasoning = &reasoning
+			}
+		}
+		if raw, ok := entry["supported_reasoning_levels"]; ok {
+			var levels []string
+			if json.Unmarshal(raw, &levels) == nil && len(levels) > 0 {
+				metadata.SupportedReasoningLevels = normalizeReasoningLevels(levels)
+				if metadata.Reasoning == nil {
+					yes := true
+					metadata.Reasoning = &yes
+				}
+			}
+		}
+		modelMetadata[id] = metadata
 	}
 	if len(modelIDs) == 0 {
 		return body
@@ -2158,6 +2205,129 @@ func convertOpenAIModelListToCodexManifestForAccount(body []byte, account *Accou
 		return body
 	}
 	return converted
+}
+
+// Apply admin rules only to descriptors synthesized from an OpenAI-style /models
+// list. This runs on the per-client body, not the shared upstream cache.
+func applyCodexReasoningToConvertedModelList(body, source []byte, account *Account, rules []CodexModelReasoningRule) ([]byte, error) {
+	if len(rules) == 0 {
+		return body, nil
+	}
+	var original struct {
+		Data []map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(source, &original); err != nil {
+		return body, nil
+	}
+	entries := make(map[string]map[string]json.RawMessage, len(original.Data))
+	for _, entry := range original.Data {
+		var id string
+		if json.Unmarshal(entry["id"], &id) == nil && strings.TrimSpace(id) != "" {
+			entries[strings.TrimSpace(id)] = entry
+		}
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, err
+	}
+	var models []json.RawMessage
+	if err := json.Unmarshal(envelope["models"], &models); err != nil {
+		return nil, err
+	}
+	var snapshot *UpstreamModelMetadataSnapshot
+	if account != nil {
+		snapshot = account.GetUpstreamModelMetadataSnapshot()
+	}
+	changed := false
+	for i, raw := range models {
+		var model map[string]json.RawMessage
+		if json.Unmarshal(raw, &model) != nil {
+			continue
+		}
+		var slug string
+		if json.Unmarshal(model["slug"], &slug) != nil {
+			continue
+		}
+		rule, configured := findCodexModelReasoningRule(rules, slug)
+		entry, converted := entries[slug]
+		if !configured || !converted {
+			continue
+		}
+		var upstream codexModelMetadataOverride
+		if snapshot != nil {
+			upstream.UpstreamModelMetadata = snapshot.Models[account.GetMappedModel(slug)]
+		}
+		conflictingCapabilities := false
+		if rawReasoning, ok := entry["reasoning"]; ok && !bytes.Equal(bytes.TrimSpace(rawReasoning), []byte("null")) {
+			var reasoning bool
+			if json.Unmarshal(rawReasoning, &reasoning) != nil {
+				continue
+			}
+			if upstream.Reasoning != nil && *upstream.Reasoning != reasoning {
+				conflictingCapabilities = true
+			}
+			upstream.Reasoning = &reasoning
+		}
+		if rawLevels, ok := entry["supported_reasoning_levels"]; ok && !bytes.Equal(bytes.TrimSpace(rawLevels), []byte("null")) {
+			var levels []string
+			if json.Unmarshal(rawLevels, &levels) != nil {
+				continue
+			}
+			levels = normalizeReasoningLevels(levels)
+			if len(upstream.SupportedReasoningLevels) > 0 {
+				levels = intersectOrderedStrings(normalizeReasoningLevels(upstream.SupportedReasoningLevels), levels)
+			}
+			if len(levels) == 0 {
+				conflictingCapabilities = true
+			}
+			upstream.SupportedReasoningLevels = levels
+		}
+		if conflictingCapabilities {
+			// Two authoritative upstream sources disagree. Drop reasoning choices
+			// rather than retaining the synced entry's over-broad capabilities.
+			model["default_reasoning_level"] = json.RawMessage("null")
+			model["supported_reasoning_levels"] = json.RawMessage("[]")
+			var err error
+			models[i], err = json.Marshal(model)
+			if err != nil {
+				return nil, err
+			}
+			changed = true
+			continue
+		}
+		if upstream.Reasoning != nil && !*upstream.Reasoning {
+			continue
+		}
+		if len(upstream.SupportedReasoningLevels) > 0 && len(intersectOrderedStrings(rule.SupportedReasoningLevels, normalizeReasoningLevels(upstream.SupportedReasoningLevels))) == 0 {
+			continue
+		}
+		descriptor := newConfiguredCodexModelDescriptor(slug)
+		applyCodexModelReasoningRule(&descriptor, rule, &upstream)
+		defaultValue, err := json.Marshal(descriptor.DefaultReasoningLevel)
+		if err != nil {
+			return nil, err
+		}
+		levelsValue, err := json.Marshal(descriptor.SupportedReasoningLevels)
+		if err != nil {
+			return nil, err
+		}
+		model["default_reasoning_level"] = defaultValue
+		model["supported_reasoning_levels"] = levelsValue
+		models[i], err = json.Marshal(model)
+		if err != nil {
+			return nil, err
+		}
+		changed = true
+	}
+	if !changed {
+		return body, nil
+	}
+	encodedModels, err := json.Marshal(models)
+	if err != nil {
+		return nil, err
+	}
+	envelope["models"] = encodedModels
+	return json.Marshal(envelope)
 }
 
 // completeAPIKeyCodexModelsManifestMetadata fills fields omitted by standard
@@ -2193,6 +2363,12 @@ func (s *OpenAIGatewayService) CompleteAPIKeyCodexModelsManifestForClient(manife
 	body, err = adjustAPIKeyCodexModelsManifest(body, account)
 	if err != nil {
 		return err
+	}
+	if manifest.convertedFromOpenAIModelList {
+		body, err = applyCodexReasoningToConvertedModelList(body, manifest.upstreamSourceBody, account, s.settingService.CodexModelReasoningRulesForManifest(context.Background()))
+		if err != nil {
+			return err
+		}
 	}
 	manifest.Body = body
 	manifest.ETag = codexModelsManifestBodyETag(manifest.Body)

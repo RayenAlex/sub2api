@@ -9,7 +9,7 @@
       </div>
 
       <!-- Settings Form -->
-      <form v-else @submit.prevent="saveSettings" class="space-y-6" novalidate>
+      <form v-else @submit.prevent="activeTab !== 'codexModelReasoning' && saveSettings()" class="space-y-6" novalidate>
         <!-- Tab Navigation -->
         <div class="settings-tabs-shell">
           <nav
@@ -8739,13 +8739,18 @@
         </div>
         <!-- /Tab: Email -->
 
+        <!-- Codex catalog reasoning settings are saved separately. -->
+        <div v-if="codexTabVisited" v-show="activeTab === 'codexModelReasoning'">
+          <CodexModelReasoningSettings />
+        </div>
+
         <!-- Tab: Backup -->
         <div v-show="activeTab === 'backup'">
           <BackupSettings />
         </div>
 
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <div v-show="activeTab !== 'backup' && activeTab !== 'codexModelReasoning'" class="flex justify-end">
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -8873,6 +8878,7 @@ import Toggle from "@/components/common/Toggle.vue";
 import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
+import CodexModelReasoningSettings from "@/views/admin/settings/CodexModelReasoningSettings.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import OpenAIFastPolicyUserSelector from "@/views/admin/settings/OpenAIFastPolicyUserSelector.vue";
 import { useClipboard } from "@/composables/useClipboard";
@@ -8933,8 +8939,10 @@ type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
-  | "backup";
+  | "backup"
+  | "codexModelReasoning";
 const activeTab = ref<SettingsTab>("general");
+const codexTabVisited = ref(false);
 const settingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
   { key: "agreement" as SettingsTab, icon: "document" as const },
@@ -8942,6 +8950,7 @@ const settingsTabs = [
   { key: "security" as SettingsTab, icon: "shield" as const },
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
+  { key: "codexModelReasoning" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
@@ -8958,6 +8967,7 @@ const settingsTabKeyboardActions = {
 
 function selectSettingsTab(tab: SettingsTab): void {
   activeTab.value = tab;
+  if (tab === "codexModelReasoning") codexTabVisited.value = true;
 }
 
 function focusSettingsTab(tab: SettingsTab): void {

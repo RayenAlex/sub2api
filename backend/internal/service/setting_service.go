@@ -132,6 +132,8 @@ type SettingService struct {
 	openAICodexVersionSF        singleflight.Group
 	codexRestrictionPolicyCache atomic.Value // *cachedCodexRestrictionPolicy
 	codexRestrictionPolicySF    singleflight.Group
+	codexModelReasoningCache    atomic.Value // *cachedCodexModelReasoningSettings
+	codexModelReasoningMu       sync.Mutex   // serialize cache fills with writes
 
 	cyberSessionBlockRuntimeCache atomic.Value // *cachedCyberSessionBlockRuntime
 	cyberSessionBlockRuntimeSF    singleflight.Group
