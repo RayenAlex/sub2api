@@ -75,9 +75,10 @@ func TestMain(m *testing.M) {
 	}
 	defer func() { _ = pgContainer.Terminate(ctx) }()
 
+	redisImage := selectDockerImage(ctx, redisImageTag)
 	redisContainer, err := tcredis.Run(
 		ctx,
-		redisImageTag,
+		redisImage,
 	)
 	if err != nil {
 		log.Printf("failed to start redis container: %v", err)
@@ -147,11 +148,17 @@ func dockerIsAvailable(ctx context.Context) bool {
 // matters for SQL that behaves differently across major versions: jsonpath
 // .datetime() only accepts the ISO-8601 "Z" designator from PostgreSQL 17 on, so
 // a suite pinned to 18 cannot observe breakage on 14-16.
+// SUB2API_TEST_REDIS_IMAGE likewise permits an explicit Redis compatibility or
+// locally cached image without changing the suite's pinned default.
 //
 //	SUB2API_TEST_POSTGRES_IMAGE=postgres:15-alpine go test -tags integration ./internal/repository/
 func selectDockerImage(ctx context.Context, preferred string) string {
 	if override := strings.TrimSpace(os.Getenv("SUB2API_TEST_POSTGRES_IMAGE")); override != "" &&
 		strings.HasPrefix(preferred, "postgres:") {
+		return override
+	}
+	if override := strings.TrimSpace(os.Getenv("SUB2API_TEST_REDIS_IMAGE")); override != "" &&
+		strings.HasPrefix(preferred, "redis:") {
 		return override
 	}
 	if dockerImageExists(ctx, preferred) {

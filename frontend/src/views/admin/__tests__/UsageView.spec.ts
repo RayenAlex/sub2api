@@ -200,6 +200,27 @@ describe('admin UsageView route filters', () => {
     vi.useRealTimers()
   })
 
+  it('forwards nested web search events with admin opt-in without changing parent totals', async () => {
+    const events = [{ id: 1, sequence: 1, call_id: 'call-1', query: 'example', status: 'completed',
+      source_count: 1, sources: [{ url: 'https://example.com' }], created_at: '2026-01-02T00:00:00Z' }]
+    const items = [{ id: 42, actual_cost: 0.25, input_tokens: 100, web_search_events: events }]
+    const before = JSON.stringify(items)
+    list.mockResolvedValue({ items, total: 37, pages: 2 })
+    getStats.mockResolvedValue({ total_requests: 37, total_tokens: 100, total_actual_cost: 0.25 })
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const table = wrapper.findComponent({ name: 'UsageTable' })
+    expect(table.props('showWebSearchEvents')).toBe(true)
+    expect(table.props('data')).toEqual(items)
+    expect(table.props('data')).toHaveLength(1)
+    expect(wrapper.findComponent({ name: 'Pagination' }).props('total')).toBe(37)
+    expect(wrapper.findComponent({ name: 'UsageStatsCards' }).props('stats')).toMatchObject({
+      total_requests: 37, total_tokens: 100, total_actual_cost: 0.25,
+    })
+    expect(JSON.stringify(items)).toBe(before)
+    wrapper.unmount()
+  })
+
   it('shows the routed user while applying user_id to usage requests', async () => {
     routeQuery.user_id = '42'
     getById.mockResolvedValue({ id: 42, email: 'route-user@test.com' })

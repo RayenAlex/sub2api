@@ -670,10 +670,29 @@ type UsageLog struct {
 	Subscription *UserSubscription `json:"subscription,omitempty"`
 }
 
+// AdminWebSearchSource is display-only source metadata, restricted to administrators.
+type AdminWebSearchSource struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// AdminWebSearchEvent never carries token or cost accounting fields.
+type AdminWebSearchEvent struct {
+	ID          int64                  `json:"id"`
+	Sequence    int                    `json:"sequence"`
+	CallID      string                 `json:"call_id"`
+	Query       string                 `json:"query"`
+	Status      string                 `json:"status"`
+	SourceCount int                    `json:"source_count"`
+	Sources     []AdminWebSearchSource `json:"sources"`
+	CreatedAt   time.Time              `json:"created_at"`
+}
+
 // AdminUsageLog 是管理员接口使用的 usage log DTO（包含管理员字段）。
 type AdminUsageLog struct {
 	UsageLog
 
+	WebSearchEvents []AdminWebSearchEvent `json:"web_search_events,omitempty"`
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Omitted when no mapping was applied (requested model was used as-is).
 	UpstreamModel *string `json:"upstream_model,omitempty"`

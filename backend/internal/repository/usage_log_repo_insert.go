@@ -157,6 +157,10 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 		return false, nil
 	}
 
+	if len(log.WebSearchEvents) > 0 {
+		return r.createWithWebSearchEvents(ctx, log)
+	}
+
 	if tx := dbent.TxFromContext(ctx); tx != nil {
 		return r.createSingle(ctx, tx.Client(), log)
 	}
@@ -171,6 +175,11 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 func (r *usageLogRepository) CreateBestEffort(ctx context.Context, log *service.UsageLog) error {
 	if log == nil {
 		return nil
+	}
+
+	if len(log.WebSearchEvents) > 0 {
+		_, err := r.createWithWebSearchEvents(ctx, log)
+		return err
 	}
 
 	if tx := dbent.TxFromContext(ctx); tx != nil {

@@ -406,6 +406,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageSizeBreakdown:       imageSizeBreakdown,
 		NativeCompactionV2:       input.NativeCompactionV2,
 		CacheDiagnostic:          result.CacheDiagnostic,
+		WebSearchEvents:          NormalizeWebSearchEvents(result.WebSearchEvents),
 	}
 	isVideoUsage := isGrokVideoUsageResult(result, billingModels)
 	if isVideoUsage {

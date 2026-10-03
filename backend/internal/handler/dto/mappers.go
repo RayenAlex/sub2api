@@ -761,6 +761,7 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	usageLog.UpstreamEndpoint = l.UpstreamEndpoint
 	return &AdminUsageLog{
 		UsageLog:                usageLog,
+		WebSearchEvents:         adminWebSearchEvents(l.WebSearchEvents),
 		UpstreamModel:           l.UpstreamModel,
 		UpstreamReasoningEffort: adminUpstreamReasoningEffort(l),
 		UpstreamResponseModel:   l.UpstreamResponseModel,
@@ -774,6 +775,30 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		IPAddress:               l.IPAddress,
 		Account:                 AccountSummaryFromService(l.Account),
 	}
+}
+
+func adminWebSearchEvents(events []service.WebSearchEvent) []AdminWebSearchEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	result := make([]AdminWebSearchEvent, len(events))
+	for eventIndex, event := range events {
+		sources := make([]AdminWebSearchSource, len(event.Sources))
+		for sourceIndex, source := range event.Sources {
+			sources[sourceIndex] = AdminWebSearchSource{URL: source.URL, Title: source.Title}
+		}
+		result[eventIndex] = AdminWebSearchEvent{
+			ID:          event.ID,
+			Sequence:    event.Sequence,
+			CallID:      event.CallID,
+			Query:       event.Query,
+			Status:      event.Status,
+			SourceCount: len(sources),
+			Sources:     sources,
+			CreatedAt:   event.CreatedAt,
+		}
+	}
+	return result
 }
 
 func userFacingReasoningEffort(l *service.UsageLog) *string {

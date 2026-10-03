@@ -15,7 +15,7 @@ import (
 func TestGetByKeyForAuthCarriesGroupTokenQuotaLimits(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)
-	repo := NewAPIKeyRepository(client)
+	repo := NewAPIKeyRepository(client, integrationDB)
 	nonce := time.Now().UnixNano()
 	dailyLimit := int64(1_000)
 	weeklyLimit := int64(2_000)

@@ -83,15 +83,36 @@ func TestPrepareUsageLogInsert_RequestedReasoningEffortArgWiring(t *testing.T) {
 	})
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
-	require.Equal(t, "text", usageLogInsertArgTypes[48], "requested_reasoning_effort must follow reasoning_effort")
-	require.Equal(t, "text", usageLogInsertArgTypes[47], "reasoning_effort arg type must stay text")
+	// Resolve positions from the emitted INSERT instead of pinning numeric offsets:
+	// adding an unrelated column must not shift this contract to service_tier.
+	query, _ := buildUsageLogBestEffortInsertQuery([]usageLogInsertPrepared{prepared})
+	_, insert, found := strings.Cut(query, "INSERT INTO usage_logs (")
+	require.True(t, found)
+	columns, _, found := strings.Cut(insert, ")")
+	require.True(t, found)
+	columnNames := strings.Split(columns, ",")
+	require.Len(t, columnNames, len(prepared.args))
+	columnIndex := func(name string) int {
+		for i, column := range columnNames {
+			if strings.TrimSpace(column) == name {
+				return i
+			}
+		}
+		t.Fatalf("missing usage log INSERT column %q", name)
+		return -1
+	}
+	forwardedIndex := columnIndex("reasoning_effort")
+	requestedIndex := columnIndex("requested_reasoning_effort")
+	require.Equal(t, forwardedIndex+1, requestedIndex, "requested_reasoning_effort must follow reasoning_effort")
+	require.Equal(t, "text", usageLogInsertArgTypes[forwardedIndex])
+	require.Equal(t, "text", usageLogInsertArgTypes[requestedIndex])
 
-	forwardedArg, ok := prepared.args[47].(sql.NullString)
+	forwardedArg, ok := prepared.args[forwardedIndex].(sql.NullString)
 	require.True(t, ok)
 	require.True(t, forwardedArg.Valid)
 	require.Equal(t, forwarded, forwardedArg.String)
 
-	requestedArg, ok := prepared.args[48].(sql.NullString)
+	requestedArg, ok := prepared.args[requestedIndex].(sql.NullString)
 	require.True(t, ok)
 	require.True(t, requestedArg.Valid)
 	require.Equal(t, requested, requestedArg.String)

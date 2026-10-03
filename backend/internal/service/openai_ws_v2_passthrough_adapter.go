@@ -1167,6 +1167,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 		firstTurnStartedAt = hooks.InitialTurnStartedAt
 	}
 	failureAccountSideEffectsApplied := false
+	// Accessed only by the upstream relay reader; reset after every turn so
+	// asynchronous usage tasks never share mutable search metadata.
+	webSearchEvents := newOpenAIWebSearchEventCollector(account)
 	relayResult, relayExit := openaiwsv2.RunEntry(openaiwsv2.EntryInput{
 		Ctx:                ctx,
 		ClientConn:         policyClientConn,
@@ -1204,7 +1207,8 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				}
 				turnRequestModel, turnUpstreamModel := usageMeta.turnModels(turn.RequestModel)
 				turnResult := &OpenAIForwardResult{
-					RequestID: turn.RequestID,
+					RequestID:       turn.RequestID,
+					WebSearchEvents: webSearchEvents.eventsCopy(),
 					Usage: OpenAIUsage{
 						InputTokens:              turn.Usage.InputTokens,
 						OutputTokens:             turn.Usage.OutputTokens,
@@ -1227,6 +1231,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 					Duration:                      turn.Duration,
 					FirstTokenMs:                  turn.FirstTokenMs,
 				}
+				webSearchEvents = newOpenAIWebSearchEventCollector(account)
 				logOpenAIWSV2Passthrough(
 					"relay_turn_completed account_id=%d turn=%d request_id=%s terminal_event=%s turn_requested_model=%s turn_upstream_model=%s duration_ms=%d first_token_ms=%d input_tokens=%d output_tokens=%d cache_read_tokens=%d",
 					account.ID,
@@ -1279,6 +1284,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 					return nil
 				}
 				eventType, _, _ := parseOpenAIWSEventEnvelope(payload)
+				webSearchEvents.observeSSE(eventType, payload)
 				if eventType == "response.created" {
 					failureAccountSideEffectsApplied = false
 				}
@@ -1345,7 +1351,8 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 
 	resultRequestModel, resultUpstreamModel := usageMeta.turnModels(relayResult.RequestModel)
 	result := &OpenAIForwardResult{
-		RequestID: relayResult.RequestID,
+		RequestID:       relayResult.RequestID,
+		WebSearchEvents: webSearchEvents.eventsCopy(),
 		Usage: OpenAIUsage{
 			InputTokens:              relayResult.Usage.InputTokens,
 			OutputTokens:             relayResult.Usage.OutputTokens,

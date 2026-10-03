@@ -272,6 +272,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 		}
 		responsesReq.Model = upstreamModel
 		normalizeResponsesRequestServiceTier(responsesReq)
+		normalizeNInferChatResponsesRequest(account, responsesReq)
 		responsesBody, err = json.Marshal(responsesReq)
 		if err != nil {
 			return nil, fmt.Errorf("marshal responses request: %w", err)

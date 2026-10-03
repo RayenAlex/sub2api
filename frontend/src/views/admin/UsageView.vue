@@ -172,6 +172,7 @@
         <UsageTable
           flat
           telemetry
+          show-web-search-events
           :data="usageLogs"
           :loading="loading"
           :columns="visibleColumns"

@@ -983,6 +983,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		responseID := ""
 		usage := OpenAIUsage{}
 		imageCounter := newOpenAIImageOutputCounter()
+		webSearchEvents := newOpenAIWebSearchEventCollector(account)
 		var firstTokenMs *int
 		reqStream := openAIWSPayloadBoolFromRaw(payload, "stream", true)
 		turnPreviousResponseID := openAIWSPayloadStringFromRaw(payload, "previous_response_id")
@@ -1026,6 +1027,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 
 			eventType, eventResponseID, _ := parseOpenAIWSEventEnvelope(upstreamMessage)
 			responseModelObserver.ObserveOpenAI(upstreamMessage, eventType)
+			webSearchEvents.observeSSE(eventType, upstreamMessage)
 			if responseID == "" && eventResponseID != "" {
 				responseID = eventResponseID
 			}
@@ -1254,6 +1256,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					ResponseHeaders:               lease.HandshakeHeaders(),
 					Duration:                      time.Since(turnStart),
 					FirstTokenMs:                  firstTokenMs,
+					WebSearchEvents:               webSearchEvents.eventsCopy(),
 				}
 				if replayInput := replayCollector.Items(); len(replayInput) > 0 {
 					result.wsReplayInput = replayInput

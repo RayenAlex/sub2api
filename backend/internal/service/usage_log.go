@@ -102,6 +102,9 @@ func ApplyLegacyRequestFields(requestType RequestType, fallbackStream bool, fall
 }
 
 type UsageLog struct {
+	// WebSearchEvents contains display-only child metadata, never billing usage.
+	WebSearchEvents []WebSearchEvent
+
 	ID        int64
 	UserID    int64
 	APIKeyID  int64

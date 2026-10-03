@@ -7,6 +7,7 @@ import { apiClient } from '../client'
 import type { AdminUsageLog, UsageQueryParams, PaginatedResponse, UsageRequestType } from '@/types'
 import type { EndpointStat } from '@/types'
 
+export type { AdminWebSearchEvent } from '@/types'
 // ==================== Types ====================
 
 export interface AdminUsageStatsResponse {

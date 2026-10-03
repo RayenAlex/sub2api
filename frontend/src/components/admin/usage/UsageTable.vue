@@ -32,11 +32,15 @@
         :columns="columns"
         :data="data"
         :loading="loading"
+        :expanded-row-keys="expandedWebSearchRows"
         :server-side-sort="serverSideSort"
         :default-sort-key="defaultSortKey"
         :default-sort-order="defaultSortOrder"
         @sort="(key, order) => $emit('sort', key, order)"
       >
+        <template #row-details="{ row, columnCount, mobile }">
+          <WebSearchEventRows :events="row.web_search_events" :column-count="columnCount" :mobile="mobile" />
+        </template>
         <template #cell-user="{ row }">
           <button
             v-if="telemetry && row.user?.email"
@@ -60,6 +64,16 @@
             </span>
             <span class="ml-1 text-gray-500 dark:text-gray-400">#{{ row.user_id }}</span>
           </div>
+          <button
+            v-if="showWebSearchEvents && row.web_search_events?.length"
+            type="button"
+            data-testid="web-search-toggle"
+            class="mt-1 block rounded px-1 py-0.5 text-xs text-primary-600 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+            :aria-expanded="expandedWebSearchRows.includes(row.id)"
+            @click.stop="toggleWebSearch(row.id)"
+          >
+            {{ t('usage.webSearch.calls', { count: row.web_search_events.length }) }}
+          </button>
         </template>
 
         <template #cell-api_key="{ row }">
@@ -484,7 +498,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
@@ -522,6 +536,7 @@ function accountBilled(row: { total_cost?: number | null; account_stats_cost?: n
 
 
 import DataTable from '@/components/common/DataTable.vue'
+import WebSearchEventRows from './WebSearchEventRows.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import IpGeoCell from '@/components/common/IpGeoCell.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -541,6 +556,7 @@ interface Props {
   /** 嵌入统一卡片内使用：去掉自身卡片外观 */
   flat?: boolean
   telemetry?: boolean
+  showWebSearchEvents?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -551,6 +567,7 @@ const props = withDefaults(defineProps<Props>(), {
   showAccountBilling: true,
   showUpstreamEndpoint: true,
   flat: false,
+  showWebSearchEvents: false,
   telemetry: false
 })
 const emit = defineEmits<{
@@ -564,6 +581,17 @@ const copiedRequestId = ref<string | null>(null)
 const showAccountBilling = props.showAccountBilling
 const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
+
+const expandedWebSearchRows = ref<number[]>([])
+const toggleWebSearch = (id: number) => {
+  expandedWebSearchRows.value = expandedWebSearchRows.value.includes(id)
+    ? expandedWebSearchRows.value.filter(key => key !== id)
+    : [...expandedWebSearchRows.value, id]
+}
+// New pages/filter results must not retain disclosure or source-list state.
+watch([() => props.data, () => props.showWebSearchEvents], () => {
+  expandedWebSearchRows.value = []
+}, { deep: true })
 
 const showIpGeoToolbar = computed(() => !props.telemetry && props.columns.some((col) => col.key === 'ip_address'))
 

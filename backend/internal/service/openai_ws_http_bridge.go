@@ -620,6 +620,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	responseID := ""
 	usage := OpenAIUsage{}
 	imageCounter := newOpenAIImageOutputCounter()
+	webSearchEvents := newOpenAIWebSearchEventCollector(account)
 	var firstTokenMs *int
 	reqStream := openAIWSPayloadBoolFromRaw(body, "stream", true)
 	eventCount := 0
@@ -654,6 +655,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		imageCount := imageCounter.Count()
 		result := &OpenAIForwardResult{
 			RequestID:                     responseID,
+			WebSearchEvents:               webSearchEvents.eventsCopy(),
 			Usage:                         usage,
 			Model:                         originalModel,
 			UpstreamModel:                 mappedModel,
@@ -758,6 +760,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		}
 		eventType, eventResponseID, _ := parseOpenAIWSEventEnvelope(upstreamMessage)
 		responseModelObserver.ObserveOpenAI(upstreamMessage, eventType)
+		webSearchEvents.observeSSE(eventType, upstreamMessage)
 		if responseID == "" && eventResponseID != "" {
 			responseID = eventResponseID
 		}

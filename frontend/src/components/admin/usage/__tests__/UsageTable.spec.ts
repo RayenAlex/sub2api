@@ -87,6 +87,7 @@ const DataTableStub = {
   template: `
     <div>
       <div v-for="row in data" :key="row.request_id">
+        <slot name="cell-user" :row="row" />
         <slot name="cell-model" :row="row" :value="row.model" />
         <slot name="cell-reasoning_effort" :row="row" :value="row.reasoning_effort" />
         <slot name="cell-billing_mode" :row="row" />
@@ -141,6 +142,18 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it('keeps web search disclosure opt-in when using the shared table stub', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{ ...baseImageRow, id: 1, web_search_events: [{ id: 1 }] }] as any,
+        columns: [],
+      },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true } },
+    })
+    expect(wrapper.find('[data-testid="web-search-toggle"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('shows each token request cache-hit rate using the billing token buckets', () => {

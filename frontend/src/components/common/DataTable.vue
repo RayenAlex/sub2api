@@ -90,6 +90,13 @@
             <slot name="cell-actions" :row="row" :value="row['actions']" :expanded="actionsExpanded"></slot>
           </div>
         </div>
+        <slot
+          v-if="expandedKeySet.has(resolveRowKey(row, index))"
+          name="row-details"
+          :row="row"
+          :column-count="tableColumnCount"
+          :mobile="true"
+        />
       </div>
     </template>
   </div>
@@ -213,9 +220,8 @@
                 :style="{ height: virtualPaddingTop + 'px', padding: 0, border: 'none' }">
             </td>
           </tr>
+          <template v-for="item in renderRows" :key="resolveRowKey(item.row, item.index)">
           <tr
-            v-for="item in renderRows"
-            :key="resolveRowKey(item.row, item.index)"
             :data-row-id="resolveRowKey(item.row, item.index)"
             :data-index="item.index"
             :ref="item.measure ? measureElement : undefined"
@@ -258,6 +264,14 @@
               </slot>
             </td>
           </tr>
+          <slot
+            v-if="expandedKeySet.has(resolveRowKey(item.row, item.index))"
+            name="row-details"
+            :row="item.row"
+            :column-count="tableColumnCount"
+            :mobile="false"
+          />
+          </template>
           <tr v-if="virtualPaddingBottom > 0" aria-hidden="true">
             <td :colspan="tableColumnCount"
                 :style="{ height: virtualPaddingBottom + 'px', padding: 0, border: 'none' }">
@@ -479,6 +493,8 @@ interface Props {
   /** Accessible label for a row selection checkbox. */
   selectionLabel?: string | ((row: any) => string)
   variant?: 'default' | 'telemetry'
+  /** Controlled detail rows; the slot emits tr elements on desktop and card content on mobile. */
+  expandedRowKeys?: Array<string | number>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -490,6 +506,7 @@ const props = withDefaults(defineProps<Props>(), {
   serverSideSort: false,
   selectable: false,
   selectedKeys: () => [],
+  expandedRowKeys: () => [],
   variant: 'default'
 })
 
@@ -715,6 +732,7 @@ const sortedData = computed(() => {
 
 const tableColumnCount = computed(() => props.columns.length + (props.selectable ? 1 : 0))
 const selectedKeySet = computed(() => new Set(props.selectedKeys))
+const expandedKeySet = computed(() => new Set(props.expandedRowKeys))
 const visibleRowKeys = computed(() =>
   (sortedData.value ?? []).map((row, index) => resolveRowKey(row, index))
 )
@@ -762,8 +780,9 @@ const toggleAllVisible = (checked: boolean) => {
 // --- Virtual scrolling ---
 // 是否启用虚拟化:仅桌面端且行数超过阈值时开启。小列表全量渲染,彻底绕开虚拟器的
 // 估算/测量/滚动补偿链路,消除可变行高导致的滚动抖动。
+// Detail rows are separate DOM rows with variable height; parent-only measurement cannot account for them.
 const shouldVirtualize = computed(() =>
-  isDesktopViewport.value && (sortedData.value?.length ?? 0) > (props.virtualizeThreshold ?? 100)
+  isDesktopViewport.value && expandedKeySet.value.size === 0 && (sortedData.value?.length ?? 0) > (props.virtualizeThreshold ?? 100)
 )
 
 const rowVirtualizer = useVirtualizer(computed(() => ({

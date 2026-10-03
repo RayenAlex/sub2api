@@ -33,6 +33,7 @@ type openaiStreamingResult struct {
 	imageCount       int
 	imageOutputSizes []string
 	searchCount      int
+	webSearchEvents  []WebSearchEvent
 }
 
 type openaiNonStreamingResult struct {
@@ -42,6 +43,7 @@ type openaiNonStreamingResult struct {
 	imageCount       int
 	imageOutputSizes []string
 	searchCount      int
+	webSearchEvents  []WebSearchEvent
 }
 
 func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel string) (*openaiStreamingResult, error) {
@@ -345,6 +347,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	// Dedup search tool calls across SSE events (item.done + response.completed
 	// both list the same call_id — counting both would ~2× the surcharge).
 	streamSearchSeen := make(map[string]struct{})
+	webSearchEvents := newOpenAIWebSearchEventCollector(account)
 	resultWithUsage := func() *openaiStreamingResult {
 		return &openaiStreamingResult{
 			usage:            usage,
@@ -353,6 +356,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			imageCount:       imageCounter.Count(),
 			imageOutputSizes: imageCounter.Sizes(),
 			searchCount:      searchCounter,
+			webSearchEvents:  webSearchEvents.eventsCopy(),
 		}
 	}
 	flushPending := func(disconnectMessage string) {
@@ -612,6 +616,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			}
 			imageCounter.AddSSEData(dataBytes)
 			searchCounter += countGrokNativeSearchCallsInSSEDataDedup(dataBytes, streamSearchSeen)
+			webSearchEvents.observeSSE(eventType, dataBytes)
 
 			// Correct Codex tool calls if needed (apply_patch -> edit, etc.)
 			if correctedData, corrected := s.toolCorrector.CorrectToolCallsInSSEBytes(dataBytes); corrected {
@@ -1672,6 +1677,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		imageCount:       countOpenAIResponseImageOutputsFromJSONBytes(body),
 		imageOutputSizes: collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
 		searchCount:      countGrokNativeSearchCallsFromJSONBytes(body),
+		webSearchEvents:  parseOpenAIWebSearchEvents(account, body, false),
 	}, nil
 }
 
@@ -1779,6 +1785,7 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		imageCount:       countOpenAIImageOutputsFromSSEBody(bodyText),
 		imageOutputSizes: collectOpenAIImageOutputSizesFromSSEBody(bodyText),
 		searchCount:      countGrokNativeSearchCallsFromSSEBody(bodyText),
+		webSearchEvents:  parseOpenAIWebSearchEvents(account, []byte(bodyText), true),
 	}, nil
 }
 

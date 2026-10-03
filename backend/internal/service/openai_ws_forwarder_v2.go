@@ -366,6 +366,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 
 	usage := &OpenAIUsage{}
 	imageCounter := newOpenAIImageOutputCounter()
+	webSearchEvents := newOpenAIWebSearchEventCollector(account)
 	var firstTokenMs *int
 	responseID := ""
 	var finalResponse []byte
@@ -419,6 +420,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	resultWithUsage := func() *OpenAIForwardResult {
 		return &OpenAIForwardResult{
 			RequestID:                     responseID,
+			WebSearchEvents:               webSearchEvents.eventsCopy(),
 			ResponseID:                    responseID,
 			Usage:                         *usage,
 			Model:                         originalModel,
@@ -614,6 +616,7 @@ readLoop:
 			continue
 		}
 		responseModelObserver.ObserveOpenAI(message, eventType)
+		webSearchEvents.observeSSE(eventType, message)
 		eventCount++
 		if firstEventType == "" {
 			firstEventType = eventType

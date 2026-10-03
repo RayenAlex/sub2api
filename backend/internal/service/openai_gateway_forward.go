@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
@@ -201,6 +202,36 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
 	}
 	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
+	if shouldNormalizeOpenAIStepResponsesAssistantTextContent(account, wsDecision.Transport, compactPath) {
+		normalizedBody, convertedMessages, normalizeErr := normalizeOpenAIStepResponsesAssistantTextContent(body)
+		if normalizeErr != nil {
+			return nil, fmt.Errorf("normalize Step Responses assistant text content: %w", normalizeErr)
+		}
+		if convertedMessages > 0 {
+			body = normalizedBody
+			originalBody = normalizedBody
+			requestView = newOpenAIRequestView(body)
+			reqModel, reqStream, promptCacheKey = requestView.Model, requestView.Stream, requestView.PromptCacheKey
+			originalModel = reqModel
+			requestID := ""
+			if ctx != nil {
+				requestID, _ = ctx.Value(ctxkey.RequestID).(string)
+				if requestID == "" {
+					requestID, _ = ctx.Value(ctxkey.ClientRequestID).(string)
+				}
+			}
+			if requestID == "" && c != nil {
+				requestID = c.GetHeader("x-request-id")
+			}
+			logger.LegacyPrintf(
+				"service.openai_gateway",
+				"[OpenAI] normalized Step Responses assistant output_text content account_id=%d request_id=%s messages=%d",
+				account.ID,
+				normalizeOpenAIWSLogValue(requestID),
+				convertedMessages,
+			)
+		}
+	}
 	if account.IsOpenAI() && (account.IsOpenAIApiKey() || account.IsOpenAIOAuthLike()) {
 		normalizedReasoningBody, reasoningChanged, reasoningErr := normalizeOpenAIResponsesReasoningContentReplay(body)
 		if reasoningErr != nil {
@@ -1221,6 +1252,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		responseID := ""
 		imageCount := 0
 		searchCount := 0
+		var webSearchEvents []WebSearchEvent
 		var imageOutputSizes []string
 		if reqStream {
 			streamResult, err := s.handleStreamingResponseWithReasoning(ctx, resp, c, account, startTime, originalModel, upstreamModel, reasoningEffortValue)
@@ -1269,6 +1301,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			imageCount = streamResult.imageCount
 			imageOutputSizes = streamResult.imageOutputSizes
 			searchCount = streamResult.searchCount
+			webSearchEvents = streamResult.webSearchEvents
 		} else {
 			nonStreamResult, err := s.handleNonStreamingResponse(ctx, resp, c, account, originalModel, upstreamModel)
 			if err != nil {
@@ -1292,6 +1325,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			imageCount = nonStreamResult.imageCount
 			imageOutputSizes = nonStreamResult.imageOutputSizes
 			searchCount = nonStreamResult.searchCount
+			webSearchEvents = nonStreamResult.webSearchEvents
 		}
 		s.bindHTTPResponseAccount(ctx, c, account, responseID)
 
@@ -1326,6 +1360,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			OpenAIWSMode:                  false,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
+			WebSearchEvents:               webSearchEvents,
 		}
 		if imageCount > 0 {
 			forwardResult.ImageCount = imageCount

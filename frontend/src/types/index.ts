@@ -1776,7 +1776,19 @@ export interface UsageLogAccountSummary {
   name: string
 }
 
+export interface AdminWebSearchEvent {
+  id: number
+  sequence: number
+  call_id: string
+  query: string
+  status: string
+  source_count: number
+  sources: Array<{ url: string; title?: string }>
+  created_at: string
+}
+
 export interface AdminUsageLog extends UsageLog {
+  web_search_events?: AdminWebSearchEvent[]
   upstream_model?: string | null
   upstream_reasoning_effort?: string | null
   upstream_response_model?: string | null

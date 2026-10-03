@@ -327,6 +327,13 @@ export default {
 
   // Usage
   usage: {
+    webSearch: {
+      calls: '网络搜索 × {count}',
+      sequence: '第 {sequence} 次调用',
+      query: '查询',
+      status: '状态',
+      sources: '来源：{count}',
+    },
     title: '使用记录',
     description: '查看和分析您的 API 使用历史',
     costDetails: '费用明细',

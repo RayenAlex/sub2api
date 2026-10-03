@@ -322,6 +322,13 @@ export default {
 
   // Usage
   usage: {
+    webSearch: {
+      calls: 'Web Search × {count}',
+      sequence: 'Call #{sequence}',
+      query: 'Query',
+      status: 'Status',
+      sources: 'Sources: {count}',
+    },
     title: 'Usage Records',
     description: 'View and analyze your API usage history',
     costDetails: 'Cost Breakdown',

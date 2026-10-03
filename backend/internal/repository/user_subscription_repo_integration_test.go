@@ -423,7 +423,7 @@ func (s *UserSubscriptionRepoSuite) TestIncrementUsage() {
 	group := s.mustCreateGroup("g-usage")
 	sub := s.mustCreateSubscription(user.ID, group.ID, nil)
 
-	err := s.repo.IncrementUsage(s.ctx, sub.ID, 1.25)
+	err := s.repo.IncrementUsage(s.ctx, sub.ID, 1.25, 0)
 	s.Require().NoError(err, "IncrementUsage")
 
 	got, err := s.repo.GetByID(s.ctx, sub.ID)
@@ -438,8 +438,8 @@ func (s *UserSubscriptionRepoSuite) TestIncrementUsage_Accumulates() {
 	group := s.mustCreateGroup("g-accum")
 	sub := s.mustCreateSubscription(user.ID, group.ID, nil)
 
-	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 1.0))
-	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 2.5))
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 1.0, 0))
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 2.5, 0))
 
 	got, err := s.repo.GetByID(s.ctx, sub.ID)
 	s.Require().NoError(err)
@@ -517,7 +517,7 @@ func (s *UserSubscriptionRepoSuite) TestResetDailyUsage_StaleResetDoesNotClearNe
 
 	newWindowStart := oldWindowStart.Add(24 * time.Hour)
 	s.Require().NoError(s.repo.ResetDailyUsage(s.ctx, sub.ID, &oldWindowStart, newWindowStart))
-	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 3))
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 3, 0))
 	// Simulate a second request carrying the stale old-window snapshot.
 	s.Require().NoError(s.repo.ResetDailyUsage(s.ctx, sub.ID, &oldWindowStart, newWindowStart))
 
@@ -538,7 +538,7 @@ func (s *UserSubscriptionRepoSuite) TestResetUsageWindows_ClearsUsageAfterAutoma
 
 	newWindowStart := oldWindowStart.Add(24 * time.Hour)
 	s.Require().NoError(s.repo.ResetDailyUsage(s.ctx, sub.ID, &oldWindowStart, newWindowStart))
-	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 3))
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 3, 0))
 	s.Require().NoError(s.repo.ResetUsageWindows(s.ctx, sub.ID, true, false, false, newWindowStart, newWindowStart))
 
 	got, err := s.repo.GetByID(s.ctx, sub.ID)
@@ -775,7 +775,7 @@ func (s *UserSubscriptionRepoSuite) TestActiveExpiredBoundaries_UsageAndReset_Ba
 
 	activateAt := time.Now().Add(-25 * time.Hour)
 	s.Require().NoError(s.repo.ActivateWindows(s.ctx, active.ID, activateAt, activateAt), "ActivateWindows")
-	s.Require().NoError(s.repo.IncrementUsage(s.ctx, active.ID, 1.25), "IncrementUsage")
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, active.ID, 1.25, 0), "IncrementUsage")
 
 	after, err := s.repo.GetByID(s.ctx, active.ID)
 	s.Require().NoError(err, "GetByID")
@@ -815,13 +815,13 @@ func (s *UserSubscriptionRepoSuite) TestIncrementUsage_SoftDeletedGroup() {
 	s.Require().NoError(err, "soft delete group")
 
 	// IncrementUsage 应该失败，因为分组已软删除
-	err = s.repo.IncrementUsage(s.ctx, sub.ID, 1.0)
+	err = s.repo.IncrementUsage(s.ctx, sub.ID, 1.0, 0)
 	s.Require().Error(err, "should fail for soft-deleted group")
 	s.Require().ErrorIs(err, service.ErrSubscriptionNotFound)
 }
 
 func (s *UserSubscriptionRepoSuite) TestIncrementUsage_NotFound() {
-	err := s.repo.IncrementUsage(s.ctx, 999999, 1.0)
+	err := s.repo.IncrementUsage(s.ctx, 999999, 1.0, 0)
 	s.Require().Error(err, "should fail for non-existent subscription")
 	s.Require().ErrorIs(err, service.ErrSubscriptionNotFound)
 }
@@ -854,7 +854,7 @@ func (s *UserSubscriptionRepoSuite) TestIncrementUsage_Concurrent() {
 	errCh := make(chan error, numGoroutines)
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
-			errCh <- s.repo.IncrementUsage(s.ctx, sub.ID, incrementPerGoroutine)
+			errCh <- s.repo.IncrementUsage(s.ctx, sub.ID, incrementPerGoroutine, 0)
 		}()
 	}
 
