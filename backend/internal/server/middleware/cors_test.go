@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -308,4 +309,48 @@ func TestNormalizeOrigins(t *testing.T) {
 			assert.Equal(t, tt.expect, result)
 		})
 	}
+}
+
+// A successful OPTIONS status is insufficient: browsers reject requested headers
+// that are absent from Access-Control-Allow-Headers before sending the POST.
+func TestCORS_AnthropicBrowserPreflightHeaders(t *testing.T) {
+	const origin = "https://detector.example.com"
+	requestedHeaders := []string{
+		"content-type", "x-api-key", "anthropic-version",
+		"anthropic-dangerous-direct-browser-access", "anthropic-beta",
+	}
+	for _, path := range []string{"/v1/messages", "/v1/responses", "/v1/chat/completions"} {
+		t.Run(path, func(t *testing.T) {
+			middleware := CORS(config.CORSConfig{AllowedOrigins: []string{origin}, AllowCredentials: true})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodOptions, path, nil)
+			c.Request.Header.Set("Origin", origin)
+			c.Request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+			c.Request.Header.Set("Access-Control-Request-Headers", strings.Join(requestedHeaders, ","))
+			middleware(c)
+			assert.Equal(t, http.StatusNoContent, w.Code)
+			assert.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
+			allowed := make(map[string]bool)
+			for _, header := range strings.Split(w.Header().Get("Access-Control-Allow-Headers"), ",") {
+				allowed[strings.ToLower(strings.TrimSpace(header))] = true
+			}
+			for _, header := range requestedHeaders {
+				assert.True(t, allowed[header], "browser preflight must allow request header %s", header)
+			}
+		})
+	}
+	t.Run("untrusted_origin_still_rejected", func(t *testing.T) {
+		middleware := CORS(config.CORSConfig{AllowedOrigins: []string{origin}, AllowCredentials: true})
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodOptions, "/v1/messages", nil)
+		c.Request.Header.Set("Origin", "https://untrusted.example.com")
+		c.Request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+		c.Request.Header.Set("Access-Control-Request-Headers", strings.Join(requestedHeaders, ","))
+		middleware(c)
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, w.Header().Get("Access-Control-Allow-Headers"))
+	})
 }
