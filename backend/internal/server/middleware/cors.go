@@ -55,6 +55,10 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 		"accept", "origin", "Cache-Control", "X-Requested-With", "X-API-Key", "X-Admin-UI-Request", "X-User-UI-Request",
 		// Anthropic Messages browser clients send these in addition to X-API-Key.
 		"Anthropic-Version", "Anthropic-Beta", "Anthropic-Dangerous-Direct-Browser-Access",
+		// Codex browser clients carry session identity and per-turn state in these headers.
+		"Originator", "Session_ID", "Conversation_ID", "OpenAI-Beta",
+		"X-Codex-Beta-Features", "X-Codex-Installation-ID", "X-Codex-Turn-State",
+		"X-Codex-Turn-Metadata", "X-Codex-Window-ID",
 	}
 	// OpenAI Node SDK 会发送 x-stainless-* 请求头，需在 CORS 中显式放行。
 	openAIProperties := []string{
@@ -85,7 +89,8 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 			}
 			c.Writer.Header().Set("Access-Control-Allow-Headers", allowHeadersValue)
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag, Server-Timing")
+			// The gateway relays this opaque state; browsers must read it for the next turn.
+			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag, Server-Timing, X-Codex-Turn-State")
 			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 		}
 		// 处理预检请求

@@ -354,3 +354,75 @@ func TestCORS_AnthropicBrowserPreflightHeaders(t *testing.T) {
 		assert.Empty(t, w.Header().Get("Access-Control-Allow-Headers"))
 	})
 }
+
+func TestCORS_CodexBrowserHeaders(t *testing.T) {
+	const origin = "https://codex-browser.example.com"
+	requestedHeaders := []string{
+		"content-type", "authorization", "originator", "session_id", "conversation_id", "openai-beta",
+		"x-codex-beta-features", "x-codex-installation-id", "x-codex-turn-state",
+		"x-codex-turn-metadata", "x-codex-window-id",
+	}
+	headerNames := func(value string) map[string]bool {
+		names := make(map[string]bool)
+		for _, name := range strings.Split(value, ",") {
+			names[strings.ToLower(strings.TrimSpace(name))] = true
+		}
+		return names
+	}
+	for _, path := range []string{
+		"/v1/responses", "/v1/responses/compact", "/responses", "/responses/compact",
+		"/backend-api/codex/responses", "/backend-api/codex/responses/compact",
+	} {
+		t.Run(path, func(t *testing.T) {
+			router := gin.New()
+			router.Use(CORS(config.CORSConfig{AllowedOrigins: []string{origin}, AllowCredentials: true}))
+			router.POST(path, func(c *gin.Context) {
+				assert.Equal(t, "Bearer sk-cors-check", c.GetHeader("Authorization"))
+				c.Header("X-Codex-Turn-State", "opaque-test-turn-state")
+				c.Status(http.StatusOK)
+			})
+			t.Run("trusted_preflight", func(t *testing.T) {
+				req := httptest.NewRequest(http.MethodOptions, path, nil)
+				req.Header.Set("Origin", origin)
+				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+				req.Header.Set("Access-Control-Request-Headers", strings.Join(requestedHeaders, ","))
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				assert.Equal(t, http.StatusNoContent, w.Code)
+				assert.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
+				assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
+				allowed := headerNames(w.Header().Get("Access-Control-Allow-Headers"))
+				for _, name := range requestedHeaders {
+					assert.True(t, allowed[name], "Codex browser preflight must allow %s", name)
+				}
+			})
+			t.Run("trusted_response_exposes_turn_state", func(t *testing.T) {
+				req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{}"))
+				req.Header.Set("Origin", origin)
+				req.Header.Set("Authorization", "Bearer sk-cors-check")
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				assert.Equal(t, http.StatusOK, w.Code)
+				assert.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
+				assert.Equal(t, "opaque-test-turn-state", w.Header().Get("X-Codex-Turn-State"))
+				exposed := headerNames(w.Header().Get("Access-Control-Expose-Headers"))
+				for _, name := range []string{"etag", "server-timing", "x-codex-turn-state"} {
+					assert.True(t, exposed[name], "browser response must expose %s", name)
+				}
+			})
+			t.Run("untrusted_preflight_still_rejected", func(t *testing.T) {
+				req := httptest.NewRequest(http.MethodOptions, path, nil)
+				req.Header.Set("Origin", "https://untrusted.example.com")
+				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+				req.Header.Set("Access-Control-Request-Headers", strings.Join(requestedHeaders, ","))
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				assert.Equal(t, http.StatusForbidden, w.Code)
+				for _, name := range []string{"Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Access-Control-Expose-Headers"} {
+					assert.Empty(t, w.Header().Get(name))
+				}
+			})
+		})
+	}
+}
