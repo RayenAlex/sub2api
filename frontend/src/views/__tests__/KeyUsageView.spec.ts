@@ -1,8 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import KeyUsageView from '../KeyUsageView.vue'
+
+enableAutoUnmount(afterEach)
 
 const { showInfo, showSuccess, showError, fetchPublicSettings } = vi.hoisted(() => ({
   showInfo: vi.fn(),
@@ -116,6 +118,7 @@ describe('KeyUsageView daily detail', () => {
       configurable: true,
       value: vi.fn().mockReturnValue({ matches: false }),
     })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => window.clearTimeout(id))
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => window.setTimeout(() => cb(0), 0))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

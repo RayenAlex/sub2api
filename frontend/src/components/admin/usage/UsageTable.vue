@@ -114,6 +114,14 @@
                 <span class="mr-0.5">↳</span>{{ row.upstream_model }}
               </div>
             </div>
+            <div v-else-if="row.response_model && row.response_model !== row.model" class="space-y-0.5">
+              <div class="break-all font-medium text-gray-900 dark:text-white">
+                {{ row.model }}
+              </div>
+              <div class="break-all text-gray-500 dark:text-gray-400" :title="t('usage.responseModel')">
+                <span class="mr-0.5">↳</span>{{ row.response_model }}
+              </div>
+            </div>
             <span v-else class="font-medium text-gray-900 dark:text-white">{{ row.model }}</span>
             <div
               v-if="row.upstream_model_mismatch === true && row.upstream_response_model"
@@ -135,16 +143,15 @@
         </template>
 
         <template #cell-reasoning_effort="{ row }">
-          <span v-if="telemetry" class="telemetry-reasoning-pill">{{ formatReasoningEffort(row.reasoning_effort) }}</span>
-          <div v-else-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
-            <div class="font-medium text-gray-900 dark:text-white">
+          <div v-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
+            <div :class="telemetry ? 'telemetry-reasoning-pill' : 'font-medium text-gray-900 dark:text-white'">
               {{ formatReasoningEffort(row.reasoning_effort) }}
             </div>
             <div class="text-gray-500 dark:text-gray-400">
               <span class="mr-0.5">↳</span>{{ formatReasoningEffort(row.upstream_reasoning_effort) }}
             </div>
           </div>
-          <span v-else data-testid="reasoning-effort-cell" class="text-sm text-gray-900 dark:text-white">
+          <span v-else data-testid="reasoning-effort-cell" :class="telemetry ? 'telemetry-reasoning-pill' : 'text-sm text-gray-900 dark:text-white'">
             {{ formatReasoningEffort(row.reasoning_effort) }}
           </span>
         </template>
@@ -262,13 +269,15 @@
                   <svg class="h-3.5 w-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   <span class="font-medium text-amber-600 dark:text-amber-400">{{ formatCacheTokens(row.cache_creation_tokens) }}</span>
                   <span v-if="row.cache_creation_1h_tokens > 0" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-100 text-orange-600 ring-1 ring-inset ring-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:ring-orange-500/30">1h</span>
+                  <span v-if="(row.cache_creation_12h_tokens ?? 0) > 0" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-100 text-orange-600 ring-1 ring-inset ring-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:ring-orange-500/30">12h</span>
                   <span v-if="row.cache_ttl_overridden" :title="t('usage.cacheTtlOverriddenHint')" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-100 text-rose-600 ring-1 ring-inset ring-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:ring-rose-500/30 cursor-help">R</span>
                 </div>
                 <span
                   v-if="row.long_context_billing_applied"
                   data-testid="long-context-billing-marker"
+                  :title="t('admin.usage.longContextPricingTooltip')"
                   class="inline-flex items-center rounded bg-amber-100 px-1 py-px text-[10px] font-semibold leading-tight text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:ring-amber-500/30"
-                >x2</span>
+                >{{ t('admin.usage.longContext') }}</span>
               </div>
               <div v-if="hasImageInputTokens(row)" class="flex items-center gap-2">
                 <div class="inline-flex items-center gap-1">
@@ -286,6 +295,7 @@
             <!-- Token Detail Tooltip -->
             <div
               class="group relative"
+              data-testid="token-breakdown-trigger"
               @mouseenter="showTokenTooltip($event, row)"
               @mouseleave="hideTokenTooltip"
             >
@@ -339,6 +349,8 @@
               <span v-else class="text-gray-400 dark:text-gray-500">-</span>
               <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyDuration') }}</span>
               <span class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[durationSeverity(row.duration_ms ?? 0)]">{{ formatDuration(row.duration_ms) }}</span>
+              <span class="text-gray-400 dark:text-gray-500" :title="t('usage.outputTpsHint')">{{ t('usage.outputTps') }}</span>
+              <span data-testid="output-tps" class="font-medium tabular-nums text-gray-700 dark:text-gray-300">{{ formatUsageOutputRate(row) }}</span>
             </div>
           </div>
         </template>
@@ -466,14 +478,10 @@
             <dd>{{ tokenTooltipData.output_tokens.toLocaleString() }}</dd>
           </div>
 
-          <template v-if="tokenTooltipData.cache_creation_5m_tokens > 0 || tokenTooltipData.cache_creation_1h_tokens > 0">
-            <div v-if="tokenTooltipData.cache_creation_5m_tokens > 0">
-              <dt>Cache Creation (5m)</dt>
-              <dd>{{ tokenTooltipData.cache_creation_5m_tokens.toLocaleString() }}</dd>
-            </div>
-            <div v-if="tokenTooltipData.cache_creation_1h_tokens > 0">
-              <dt>Cache Creation (1h)</dt>
-              <dd>{{ tokenTooltipData.cache_creation_1h_tokens.toLocaleString() }}</dd>
+          <template v-if="tokenTooltipCacheWriteBuckets.length">
+            <div v-for="bucket in tokenTooltipCacheWriteBuckets" :key="bucket.ttl">
+              <dt>Cache Creation ({{ bucket.ttl }})</dt>
+              <dd>{{ bucket.tokens.toLocaleString() }}</dd>
             </div>
           </template>
           <div v-else-if="tokenTooltipData.cache_creation_tokens > 0">
@@ -493,8 +501,6 @@
       </div>
     </div>
   </Teleport>
-
-
 </template>
 
 <script setup lang="ts">
@@ -511,6 +517,7 @@ import {
   LATENCY_TEXT_CLASSES,
   durationSeverity,
   firstTokenSeverity,
+  formatUsageOutputRate,
 } from '@/utils/latencyHealth'
 import {
   BILLING_MODE_TOKEN,
@@ -798,6 +805,16 @@ const telemetryLayoutStyle = computed(() => {
   )
 
   return { '--telemetry-layout-width': `${width}px` }
+})
+
+const tokenTooltipCacheWriteBuckets = computed(() => {
+  const row = tokenTooltipData.value
+  return [
+    { ttl: '5m', tokens: row?.cache_creation_5m_tokens ?? 0 },
+    { ttl: '30m', tokens: row?.cache_creation_30m_tokens ?? 0 },
+    { ttl: '1h', tokens: row?.cache_creation_1h_tokens ?? 0 },
+    { ttl: '12h', tokens: row?.cache_creation_12h_tokens ?? 0 },
+  ].filter(bucket => bucket.tokens > 0)
 })
 
 const tokenTooltipTotal = computed(() => {

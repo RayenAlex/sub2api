@@ -103,7 +103,7 @@ func normalizeOpenAIStepResponsesAssistantItem(rawItem json.RawMessage) (json.Ra
 		if !ok {
 			return rawItem, false
 		}
-		text.WriteString(blockText)
+		_, _ = text.WriteString(blockText)
 	}
 
 	normalizedContent, err := json.Marshal(text.String())

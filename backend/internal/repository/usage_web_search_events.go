@@ -39,7 +39,7 @@ func (r *usageLogRepository) createWithWebSearchEvents(ctx context.Context, log 
 	if err != nil {
 		return false, service.MarkUsageLogCreateNotPersisted(err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	inserted, err := write(tx)
 	if err != nil {
 		return false, service.MarkUsageLogCreateNotPersisted(err)

@@ -14,9 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// openAITransportErrorTempUnschedDuration is how long an account is temporarily
-// unscheduled after a durable transport failure (matches tokenRefreshTempUnschedDuration).
-const openAITransportErrorTempUnschedDuration = 10 * time.Minute
+const (
+	openAITransportReachabilityCooldown = 30 * time.Second
+	openAITransportProxyAuthCooldown    = 10 * time.Minute
+)
 
 // openAITransportFailoverBody is the OpenAI-format error body attached to the
 // failover error for a transport-level failure. Kept identical to the legacy
@@ -27,76 +28,67 @@ var openAITransportFailoverBody = []byte(`{"error":{"type":"upstream_error","mes
 // upstreamTransportErrorClass describes how to react to a transport-level upstream
 // failure — i.e. the HTTP round-trip never completed (proxy / DNS / TCP / TLS
 // error, no HTTP status code received).
-type upstreamTransportErrorClass struct {
-	// Persistent marks failures where retrying the same proxy/account is
-	// pointless: expired or rejected proxy credentials, a dead proxy endpoint,
-	// or DNS/routing failure. Such accounts should be temporarily unscheduled
-	// (and alerted on) instead of being repeatedly scheduled into hard failures.
-	Persistent bool
-}
+type upstreamTransportErrorClass uint8
 
-// persistentUpstreamTransportErrorMarkers are substrings (matched case-insensitively
-// against the raw transport error) that indicate a durable proxy/network fault.
-// Matched signals are intentionally specific failure *reasons*, not the operation
-// (e.g. we match "connection refused", not "proxyconnect") so that a transient
-// failure of the same operation (a proxy timeout) is NOT misclassified as durable.
-var persistentUpstreamTransportErrorMarkers = []string{
-	"authentication failed",         // SOCKS5 RFC1929 / proxy credentials rejected (expired account)
-	"proxy authentication required", // HTTP proxy 407
-	"connection refused",            // proxy/upstream endpoint down
+const (
+	upstreamTransportTransient upstreamTransportErrorClass = iota
+	upstreamTransportReachability
+	upstreamTransportProxyAuth
+)
+
+// Match specific reachability errors so a proxy timeout keeps its transient classification.
+var upstreamReachabilityErrorMarkers = []string{
+	"connection refused",
 	"no route to host",
 	"network is unreachable",
-	"no such host", // DNS resolution failure (bad/expired proxy hostname)
+	"no such host",
 }
 
-// classifyUpstreamTransportError decides whether a transport-level upstream error
-// is durable (Persistent — evict the account + alert) or a transient blip
-// (fail over to a healthy account but keep this one schedulable).
-//
-// Motivating incident: a SOCKS5 proxy whose subscription lapsed returned
-// `username/password authentication failed`; the account was nonetheless
-// rescheduled on every request, hard-failing users with 502s.
-//
-// Classification strategy (mirrors sanitizeStreamError in gateway_service.go):
-//  1. Typed-error checks first (syscall constants, *net.DNSError) — portable and
-//     unambiguous.
-//  2. String-marker fallback for errors that have no typed form (e.g. the plain
-//     string returned by golang.org/x/net/proxy for SOCKS5 credential rejection).
-//     The network-layer string markers ("connection refused", "no route to host",
-//     "network is unreachable", "no such host") are kept as a cross-platform safety
-//     net even though the typed checks should cover them on modern Go+Linux.
+// classifyUpstreamTransportError distinguishes reachability failures that can
+// recover when the network returns from rejected proxy credentials that require
+// operator intervention. Prefer typed errors and fall back to transport messages.
 func classifyUpstreamTransportError(err error) upstreamTransportErrorClass {
 	if err == nil {
-		return upstreamTransportErrorClass{}
+		return upstreamTransportTransient
 	}
 
-	// — Typed checks (preferred) ——————————————————————————————————————————————
 	if errors.Is(err, syscall.ECONNREFUSED) ||
 		errors.Is(err, syscall.EHOSTUNREACH) ||
 		errors.Is(err, syscall.ENETUNREACH) {
-		return upstreamTransportErrorClass{Persistent: true}
+		return upstreamTransportReachability
 	}
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
-		return upstreamTransportErrorClass{Persistent: true}
+		return upstreamTransportReachability
 	}
 
-	// — String-marker fallback ————————————————————————————————————————————————
+	// SOCKS5 and HTTP CONNECT report rejected credentials as plain errors.
 	msg := strings.ToLower(err.Error())
-	for _, marker := range persistentUpstreamTransportErrorMarkers {
+	if strings.Contains(msg, "authentication failed") || strings.Contains(msg, "proxy authentication required") {
+		return upstreamTransportProxyAuth
+	}
+	for _, marker := range upstreamReachabilityErrorMarkers {
 		if strings.Contains(msg, marker) {
-			return upstreamTransportErrorClass{Persistent: true}
+			return upstreamTransportReachability
 		}
 	}
-	return upstreamTransportErrorClass{}
+	return upstreamTransportTransient
+}
+
+// isClientCanceledTransportError reports whether a transport-level failure was
+// caused by the client disconnecting: the request context itself is canceled
+// and the round-trip aborted with context.Canceled. Such a failure says nothing
+// about the upstream, so it is not recorded as an Ops upstream error event.
+func isClientCanceledTransportError(ctx context.Context, err error) bool {
+	return errors.Is(err, context.Canceled) && ctx != nil && errors.Is(ctx.Err(), context.Canceled)
 }
 
 // handleOpenAIUpstreamTransportError handles a transport-level upstream failure
 // (Do/DoWithTLS returned a non-HTTP error: proxy/DNS/TCP/TLS). It:
-//  1. records the failure in Ops error logs (status 0, kind=request_error);
-//  2. for durable faults (expired/rejected proxy creds, dead proxy, DNS/routing)
-//     temporarily unschedules the account (DB + in-memory) and logs a stable
-//     warn event that alert rules can key on;
+//  1. records the failure in Ops error logs (status 0, kind=request_error),
+//     except when the client disconnected (see isClientCanceledTransportError);
+//  2. temporarily unschedules the account (DB + in-memory) for reachability
+//     failures and rejected proxy credentials, with a cooldown for each class;
 //  3. returns an error that is *UpstreamFailoverError (so the handler fails over
 //     to a healthy account) for all non-canceled errors, or a plain error for
 //     context.Canceled (client gone — no failover, no eviction).
@@ -106,6 +98,9 @@ func classifyUpstreamTransportError(err error) upstreamTransportErrorClass {
 //
 // passthrough tags the Ops error event for the OpenAI passthrough forward path.
 func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Context, c *gin.Context, account *Account, err error, passthrough bool) error {
+	if isClientCanceledTransportError(ctx, err) {
+		return err
+	}
 	safeErr := sanitizeUpstreamErrorMessage(err.Error())
 	setOpsUpstreamError(c, 0, safeErr, "")
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -126,9 +121,10 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		return err
 	}
 
-	// Transport attempt reached the network path; count as Ollama Cloud activity.
+	// Transport attempt reached the network path; count as Ollama Cloud / OpenCode Go activity.
 	if s != nil {
 		scheduleOllamaCloudUsageActivity(s.deferredService, account)
+		scheduleOpenCodeGoUsageActivity(s.deferredService, account)
 	}
 
 	// 插件已把请求交给上游时，自动切换账号可能造成重复扣费或重复执行。
@@ -137,8 +133,11 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		return err
 	}
 
-	if classifyUpstreamTransportError(err).Persistent {
-		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr)
+	switch classifyUpstreamTransportError(err) {
+	case upstreamTransportReachability:
+		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr, openAITransportReachabilityCooldown)
+	case upstreamTransportProxyAuth:
+		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr, openAITransportProxyAuthCooldown)
 	}
 
 	return &UpstreamFailoverError{
@@ -148,7 +147,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 }
 
 // tempUnscheduleOpenAITransportError marks an account temporarily unschedulable
-// after a durable transport failure, both persistently (DB, survives restart)
+// after a transport failure, both persistently (DB, survives restart)
 // and in-memory (immediate scheduler effect before the DB/account cache propagates).
 //
 // Log semantics:
@@ -158,11 +157,14 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 //     accountRepo is nil (in-memory only; no persistence).
 //   - "openai.account_temp_unscheduled_transport_failed" — DB write attempted
 //     but returned an error.
-func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Context, account *Account, safeErr string) {
+func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Context, account *Account, safeErr string, cooldown time.Duration) {
 	if s == nil || account == nil {
 		return
 	}
-	until := time.Now().Add(openAITransportErrorTempUnschedDuration)
+	if s.cfg != nil && s.cfg.Gateway.DisableOpenAITransportErrorCooldown {
+		return
+	}
+	until := time.Now().Add(cooldown)
 	reason := "upstream transport error (proxy/network): " + safeErr
 
 	// Immediate in-memory block so this process skips the account until the

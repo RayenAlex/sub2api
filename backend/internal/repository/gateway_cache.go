@@ -70,6 +70,53 @@ func (c *gatewayCache) DeleteSessionAccountID(ctx context.Context, groupID int64
 	return c.rdb.Del(ctx, key).Err()
 }
 
+// compareAndBindStickySessionScript writes the served account unless another
+// request rebound the key during the forward. ARGV[1] is the account, ARGV[2]
+// the TTL in milliseconds and ARGV[3..] the accounts this request failed over
+// from, which it may have written itself. A key already holding the account only
+// gets its TTL refreshed; a missing key and one holding a replaceable account
+// are written; any other value is left alone and 0 is returned.
+var compareAndBindStickySessionScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if current == ARGV[1] then
+  redis.call('PEXPIRE', KEYS[1], ARGV[2])
+  return 1
+end
+if current == false then
+  redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+  return 1
+end
+for i = 3, #ARGV do
+  if current == ARGV[i] then
+    redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+    return 1
+  end
+end
+return 0
+`)
+
+func (c *gatewayCache) CompareAndBindSessionAccountID(ctx context.Context, groupID int64, sessionHash string, accountID int64, replaceableAccountIDs []int64, ttl time.Duration) (bool, error) {
+	if c == nil || c.rdb == nil {
+		return false, errors.New("gateway cache unavailable")
+	}
+	if strings.TrimSpace(sessionHash) == "" || ttl <= 0 {
+		return false, errors.New("invalid sticky session bind")
+	}
+	// The bound values are stored as decimal strings (see SetSessionAccountID).
+	args := make([]any, 0, 2+len(replaceableAccountIDs))
+	args = append(args, strconv.FormatInt(accountID, 10), ttl.Milliseconds())
+	for _, replaceableAccountID := range replaceableAccountIDs {
+		args = append(args, strconv.FormatInt(replaceableAccountID, 10))
+	}
+	n, err := compareAndBindStickySessionScript.Run(
+		ctx,
+		c.rdb,
+		[]string{buildSessionKey(groupID, sessionHash)},
+		args...,
+	).Int()
+	return n == 1, err
+}
+
 var claimOpenAIResponsesSessionWindowScript = redis.NewScript(`
 local previous = redis.call('GET', KEYS[1])
 redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
@@ -160,6 +207,7 @@ func (c *gatewayCache) CompareAndDeleteOpenAIResponsesSessionWindow(ctx context.
 }
 
 var _ service.OpenAIWSSessionPreemptionCache = (*gatewayCache)(nil)
+var _ service.GatewayStickySessionCompareCache = (*gatewayCache)(nil)
 
 const (
 	grokVideoPendingBillingPrefix = "grok_video_pending:"
@@ -270,15 +318,21 @@ func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (
 }
 
 const (
-	cyberSessionBlockPrefix         = "cyber_session_block:"
-	cyberSessionScopePrefix         = "cyber_session_scope:"
-	cyberSessionRedisCommandMaxKeys = 128
+	cyberSessionBlockPrefix             = "cyber_session_block:"
+	cyberSessionScopePrefix             = "cyber_session_scope:"
+	cyberSessionTranscriptLengthsPrefix = "cyber_session_transcript_lengths:"
+	cyberSessionRedisCommandMaxKeys     = 128
 )
 
+func cyberSessionTranscriptLengthsKey(apiKeyID int64) string {
+	return cyberSessionTranscriptLengthsPrefix + strconv.FormatInt(apiKeyID, 10)
+}
+
 // SetCyberSessionBlocked writes exact blocks in bounded transactions. The
-// coarse scope is activated only after all exact blocks have been stored.
-func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, scopeKey string, keys []string, ttl time.Duration) error {
-	if len(keys) == 0 {
+// transcript length index and the coarse scope are activated only after all
+// exact blocks have been stored.
+func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, block service.CyberSessionBlock, ttl time.Duration) error {
+	if len(block.Keys) == 0 {
 		return nil
 	}
 	exactKeys := make([]string, 0, cyberSessionRedisCommandMaxKeys)
@@ -294,7 +348,7 @@ func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, scopeKey stri
 		exactKeys = exactKeys[:0]
 		return err
 	}
-	for _, key := range keys {
+	for _, key := range block.Keys {
 		if key != "" {
 			exactKeys = append(exactKeys, key)
 			if len(exactKeys) == cyberSessionRedisCommandMaxKeys {
@@ -307,18 +361,53 @@ func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, scopeKey stri
 	if err := flush(); err != nil {
 		return err
 	}
-	if scopeKey != "" {
-		return c.rdb.Set(ctx, cyberSessionScopePrefix+scopeKey, "1", ttl).Err()
+	if block.ScopeKey == "" {
+		return nil
 	}
-	return nil
+	pipe := c.rdb.TxPipeline()
+	if len(block.TranscriptLengths) > 0 {
+		lengthsKey := cyberSessionTranscriptLengthsKey(block.APIKeyID)
+		members := make([]any, len(block.TranscriptLengths))
+		for i, length := range block.TranscriptLengths {
+			members[i] = length
+		}
+		pipe.SAdd(ctx, lengthsKey, members...)
+		pipe.Expire(ctx, lengthsKey, ttl)
+	}
+	pipe.Set(ctx, cyberSessionScopePrefix+block.ScopeKey, "1", ttl)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
-func (c *gatewayCache) IsCyberSessionScopeActive(ctx context.Context, scopeKey string) (bool, error) {
-	n, err := c.rdb.Exists(ctx, cyberSessionScopePrefix+scopeKey).Result()
-	if err != nil {
-		return false, err
+// cyberSessionTranscriptLengthsScript reads the API key's length index only
+// when the source scope is active, keeping inactive sources to one EXISTS.
+var cyberSessionTranscriptLengthsScript = redis.NewScript(`
+	if redis.call('EXISTS', KEYS[1]) == 0 then
+		return {}
+	end
+	return redis.call('SMEMBERS', KEYS[2])
+`)
+
+func (c *gatewayCache) CyberSessionTranscriptLengths(ctx context.Context, apiKeyID int64, scopeKey string) ([]int, error) {
+	if scopeKey == "" {
+		return nil, nil
 	}
-	return n > 0, nil
+	members, err := cyberSessionTranscriptLengthsScript.Run(ctx, c.rdb, []string{
+		cyberSessionScopePrefix + scopeKey,
+		cyberSessionTranscriptLengthsKey(apiKeyID),
+	}).StringSlice()
+	if err != nil {
+		return nil, err
+	}
+	lengths := make([]int, 0, len(members))
+	for _, member := range members {
+		length, err := strconv.Atoi(member)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cyber transcript length %q: %w", member, err)
+		}
+		lengths = append(lengths, length)
+	}
+	return lengths, nil
 }
 
 // FindCyberSessionBlocked checks bounded batches in caller order and stops at

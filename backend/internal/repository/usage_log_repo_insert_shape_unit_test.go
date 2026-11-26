@@ -129,7 +129,7 @@ func TestPrepareUsageLogInsert_UpstreamRequestIDArgWiring(t *testing.T) {
 	})
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
 
-	idx := len(prepared.args) - 5
+	idx := len(prepared.args) - 7
 	arg, ok := prepared.args[idx].(sql.NullString)
 	require.True(t, ok, "upstream_request_id arg should be sql.NullString, got %T", prepared.args[idx])
 	require.True(t, arg.Valid)
@@ -161,7 +161,7 @@ func TestPrepareUsageLogInsert_CacheDiagnosticArgWiring(t *testing.T) {
 	})
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
 
-	idx := len(prepared.args) - 3
+	idx := len(prepared.args) - 5
 	arg, ok := prepared.args[idx].(sql.NullString)
 	require.True(t, ok, "cache_diagnostic arg should be sql.NullString, got %T", prepared.args[idx])
 	require.True(t, arg.Valid)
@@ -185,7 +185,7 @@ func TestUsageLogInsertQueries_IncludeCacheDiagnostic(t *testing.T) {
 	key := usageLogBatchKey("client:cache-diagnostic-query", 2)
 
 	batchQuery, _ := buildUsageLogBatchInsertQuery([]string{key}, map[string]usageLogInsertPrepared{key: prepared})
-	require.Contains(t, batchQuery, "cache_diagnostic")
+	require.Equal(t, 3, strings.Count(batchQuery, "cache_diagnostic"), "CTE, insert columns and select projection must preserve cache diagnostics")
 
 	bestEffortQuery, _ := buildUsageLogBestEffortInsertQuery([]usageLogInsertPrepared{prepared})
 	require.Contains(t, bestEffortQuery, "cache_diagnostic")

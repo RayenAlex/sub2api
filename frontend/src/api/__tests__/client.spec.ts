@@ -260,6 +260,25 @@ describe('API Client', () => {
       )
     })
 
+    it.each([
+      ['17', 17],
+      ['Wed, 21 Oct 2026 07:28:00 GMT', undefined],
+      [undefined, undefined],
+    ])('429 结构化错误携带 Retry-After 秒数（%s）', async (retryAfter, expected) => {
+      apiClient.defaults.adapter = vi.fn().mockRejectedValueOnce({
+        response: {
+          status: 429,
+          data: { code: 'RATE_LIMITED', message: 'Too many requests' },
+          headers: retryAfter === undefined ? {} : { 'retry-after': retryAfter },
+        },
+        config: { url: '/usage', headers: {} },
+      })
+
+      const error = await apiClient.get('/usage').catch((err) => err)
+      expect(error).toMatchObject({ status: 429, code: 'RATE_LIMITED', message: 'Too many requests' })
+      expect(error.retry_after_seconds).toBe(expected)
+    })
+
     it('部署与运营合规未确认时广播事件且保留登录态', async () => {
       localStorage.setItem('auth_token', 'admin-token')
       const listener = vi.fn()
@@ -494,9 +513,9 @@ describe('API Client', () => {
   // --- 网络错误 ---
 
   describe('网络错误', () => {
-    it('网络错误返回 status 0 的错误', async () => {
+    it.each(['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', undefined])('网络错误保留错误码 %s', async (code) => {
       const adapter = vi.fn().mockRejectedValue({
-        code: 'ERR_NETWORK',
+        code,
         message: 'Network Error',
         config: { url: '/test' },
         // 没有 response
@@ -506,6 +525,7 @@ describe('API Client', () => {
       await expect(apiClient.get('/test')).rejects.toEqual(
         expect.objectContaining({
           status: 0,
+          code: code || 'ERR_NETWORK',
           message: 'Network error. Please check your connection.',
         })
       )

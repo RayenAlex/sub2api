@@ -17,11 +17,14 @@ func TestWebSearchEventsAdminJSONContract(t *testing.T) {
 	require.NoError(t, err)
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(payload, &decoded))
-	events := decoded["web_search_events"].([]any)
+	events, ok := decoded["web_search_events"].([]any)
+	require.True(t, ok)
 	require.Len(t, events, 2)
-	first := events[0].(map[string]any)
+	first, ok := events[0].(map[string]any)
+	require.True(t, ok)
 	require.Equal(t, map[string]any{"id": float64(11), "sequence": float64(1), "call_id": "call_1", "query": "private search", "status": "completed", "source_count": float64(0), "sources": []any{}, "created_at": "2026-01-02T03:04:05Z"}, first)
-	second := events[1].(map[string]any)
+	second, ok := events[1].(map[string]any)
+	require.True(t, ok)
 	require.Equal(t, float64(1), second["source_count"])
 	require.Equal(t, []any{map[string]any{"url": "https://example.com", "title": "Example"}}, second["sources"])
 	// Explicit child DTOs must not inherit parent billing/account fields.

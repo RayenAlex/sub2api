@@ -31,7 +31,7 @@ describe('useScrollReveal', () => {
   })
 
   it('initializes and observes elements in standard mode', async () => {
-    let observedElements: Element[] = []
+    const observedElements: Element[] = []
     const observeMock = vi.fn((el: Element) => observedElements.push(el))
     const disconnectMock = vi.fn()
     const unobserveMock = vi.fn()

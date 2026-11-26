@@ -213,6 +213,11 @@ const sharedPageStubs = {
   EmptyState: true,
 }
 
+function hideAdminReasoningColumn() {
+  localStorage.setItem('usage-hidden-columns', JSON.stringify(['reasoning_effort']))
+  localStorage.setItem('usage-hidden-columns-version', 'orbital-telemetry-ledger-v1')
+}
+
 function reasoningCellText(wrapper: ReturnType<typeof mount>): string {
   return wrapper.get('[data-testid="reasoning-effort-cell"]').text()
 }
@@ -260,6 +265,7 @@ describe('usage reasoning effort page display', () => {
   })
 
   it('admin usage page shows requested and mapped effort after the column is enabled', async () => {
+    hideAdminReasoningColumn()
     const wrapper = mount(AdminUsageView, {
       global: {
         stubs: {
@@ -295,6 +301,7 @@ describe('usage reasoning effort page display', () => {
       pages: 1,
     })
 
+    hideAdminReasoningColumn()
     const wrapper = mount(AdminUsageView, {
       global: {
         stubs: {

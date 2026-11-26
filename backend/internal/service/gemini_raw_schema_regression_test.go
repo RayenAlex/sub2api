@@ -3,6 +3,8 @@ package service
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/tidwall/gjson"
 )
 
 func TestNormalizeGeminiRawChatToolSchemasAddsItemsToBareNestedArrays(t *testing.T) {
@@ -13,21 +15,17 @@ func TestNormalizeGeminiRawChatToolSchemasAddsItemsToBareNestedArrays(t *testing
 		t.Fatalf("normalizeGeminiRawChatToolSchemas: %v", err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(got, &payload); err != nil {
-		t.Fatalf("decode normalized body: %v", err)
-	}
-	properties := payload["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)["parameters"].(map[string]any)["properties"].(map[string]any)
-	if gotType, _ := properties["fields"].(map[string]any)["type"].(string); gotType != "array" {
+	properties := gjson.GetBytes(got, "tools.0.function.parameters.properties")
+	if gotType := properties.Get("fields.type").String(); gotType != "array" {
 		t.Fatalf("fields.type = %#v, want array", gotType)
 	}
-	if got, _ := properties["fields"].(map[string]any)["items"].(map[string]any)["type"].(string); got != "string" {
+	if got := properties.Get("fields.items.type").String(); got != "string" {
 		t.Fatalf("fields.items.type = %#v, want string", got)
 	}
-	if got, _ := properties["pages"].(map[string]any)["items"].(map[string]any)["items"].(map[string]any)["type"].(string); got != "string" {
+	if got := properties.Get("pages.items.items.type").String(); got != "string" {
 		t.Fatalf("pages.items.items.type = %#v, want string", got)
 	}
-	if got, _ := properties["files"].(map[string]any)["items"].(map[string]any)["type"].(string); got != "object" {
+	if got := properties.Get("files.items.type").String(); got != "object" {
 		t.Fatalf("files.items.type = %#v, want object", got)
 	}
 }
@@ -40,29 +38,17 @@ func TestNormalizeGeminiRawChatToolSchemasRemovesObjectOnlyFieldsFromNonObjectSc
 		t.Fatalf("normalizeGeminiRawChatToolSchemas: %v", err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(got, &payload); err != nil {
-		t.Fatalf("decode normalized body: %v", err)
+	properties := gjson.GetBytes(got, "tools.0.function.parameters.properties")
+	size := properties.Get("size")
+	if size.Get("properties").Exists() || size.Get("required").Exists() {
+		t.Fatalf("non-object size schema should not retain object-only fields: %s", size.Raw)
 	}
-	properties := payload["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)["parameters"].(map[string]any)["properties"].(map[string]any)
-
-	size := properties["size"].(map[string]any)
-	if _, exists := size["properties"]; exists {
-		t.Fatalf("non-object size schema should not retain properties: %#v", size)
+	if size.Get("type").String() != "string" || size.Get("description").String() != "width" {
+		t.Fatalf("non-object schema should retain its type and description: %s", size.Raw)
 	}
-	if _, exists := size["required"]; exists {
-		t.Fatalf("non-object size schema should not retain required: %#v", size)
-	}
-	if size["type"] != "string" || size["description"] != "width" {
-		t.Fatalf("non-object schema should retain its type and description: %#v", size)
-	}
-
-	ok := properties["ok"].(map[string]any)
-	if _, exists := ok["properties"]; !exists {
-		t.Fatalf("object schema should retain properties: %#v", ok)
-	}
-	if _, exists := ok["required"]; !exists {
-		t.Fatalf("object schema should retain required: %#v", ok)
+	object := properties.Get("ok")
+	if !object.Get("properties").Exists() || !object.Get("required").Exists() {
+		t.Fatalf("object schema should retain its object fields: %s", object.Raw)
 	}
 }
 
@@ -74,19 +60,14 @@ func TestNormalizeGeminiRawChatToolSchemasPromotesUntypedPropertiesToObject(t *t
 		t.Fatalf("normalizeGeminiRawChatToolSchemas: %v", err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(got, &payload); err != nil {
-		t.Fatalf("decode normalized body: %v", err)
-	}
-	properties := payload["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)["parameters"].(map[string]any)["properties"].(map[string]any)
-	size := properties["size"].(map[string]any)
-	if size["type"] != "object" {
+	size := gjson.GetBytes(got, "tools.0.function.parameters.properties.size")
+	if size.Get("type").String() != "object" {
 		t.Fatalf("untyped properties schema should be promoted to object: %#v", size)
 	}
-	if _, exists := size["properties"]; !exists {
+	if !size.Get("properties").Exists() {
 		t.Fatalf("untyped properties schema should retain properties: %#v", size)
 	}
-	if _, exists := size["required"]; !exists {
+	if !size.Get("required").Exists() {
 		t.Fatalf("untyped properties schema should retain required: %#v", size)
 	}
 }
@@ -99,33 +80,29 @@ func TestNormalizeGeminiRawChatToolSchemasHandlesNullableTypes(t *testing.T) {
 		t.Fatalf("normalizeGeminiRawChatToolSchemas: %v", err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(got, &payload); err != nil {
-		t.Fatalf("decode normalized body: %v", err)
-	}
-	properties := payload["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)["parameters"].(map[string]any)["properties"].(map[string]any)
+	properties := gjson.GetBytes(got, "tools.0.function.parameters.properties")
 
-	maybe := properties["maybe"].(map[string]any)
-	if _, exists := maybe["properties"]; !exists {
+	maybe := properties.Get("maybe")
+	if !maybe.Get("properties").Exists() {
 		t.Fatalf("nullable object schema should retain properties: %#v", maybe)
 	}
-	if _, exists := maybe["required"]; !exists {
+	if !maybe.Get("required").Exists() {
 		t.Fatalf("nullable object schema should retain required: %#v", maybe)
 	}
 
-	text := properties["text"].(map[string]any)
-	if _, exists := text["properties"]; exists {
+	text := properties.Get("text")
+	if text.Get("properties").Exists() {
 		t.Fatalf("nullable scalar schema should not retain properties: %#v", text)
 	}
-	if _, exists := text["required"]; exists {
+	if text.Get("required").Exists() {
 		t.Fatalf("nullable scalar schema should not retain required: %#v", text)
 	}
 
-	nullObject := properties["nullObject"].(map[string]any)
-	if nullObject["type"] != "object" {
+	nullObject := properties.Get("nullObject")
+	if nullObject.Get("type").String() != "object" {
 		t.Fatalf("null type with properties should be normalized to object: %#v", nullObject)
 	}
-	if _, exists := nullObject["properties"]; !exists {
+	if !nullObject.Get("properties").Exists() {
 		t.Fatalf("null type with properties should retain properties: %#v", nullObject)
 	}
 }
@@ -138,15 +115,11 @@ func TestNormalizeGeminiRawChatToolSchemasDoesNotNormalizeSchemaAnnotationValues
 		t.Fatalf("normalizeGeminiRawChatToolSchemas: %v", err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(got, &payload); err != nil {
-		t.Fatalf("decode normalized body: %v", err)
-	}
-	properties := payload["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)["parameters"].(map[string]any)["properties"].(map[string]any)
-	value := properties["value"].(map[string]any)
-	assertDeepEqualJSON(t, "default", value["default"], map[string]any{"properties": "example", "required": "required"})
-	assertDeepEqualJSON(t, "examples[0]", value["examples"].([]any)[0], map[string]any{"type": "string", "properties": "example"})
-	assertDeepEqualJSON(t, "const", value["const"], map[string]any{"type": "object"})
+	properties := gjson.GetBytes(got, "tools.0.function.parameters.properties")
+	value := properties.Get("value")
+	assertDeepEqualJSON(t, "default", value.Get("default").Value(), map[string]any{"properties": "example", "required": "required"})
+	assertDeepEqualJSON(t, "examples[0]", value.Get("examples.0").Value(), map[string]any{"type": "string", "properties": "example"})
+	assertDeepEqualJSON(t, "const", value.Get("const").Value(), map[string]any{"type": "object"})
 }
 
 func TestNormalizeGeminiRawChatToolSchemasToleratesMalformedProperties(t *testing.T) {

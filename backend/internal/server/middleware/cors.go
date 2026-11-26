@@ -59,6 +59,7 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 		"Originator", "Session_ID", "Conversation_ID", "OpenAI-Beta",
 		"X-Codex-Beta-Features", "X-Codex-Installation-ID", "X-Codex-Turn-State",
 		"X-Codex-Turn-Metadata", "X-Codex-Window-ID",
+		"MCP-Protocol-Version", "MCP-Session-Id",
 	}
 	// OpenAI Node SDK 会发送 x-stainless-* 请求头，需在 CORS 中显式放行。
 	openAIProperties := []string{
@@ -71,6 +72,28 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 	allowHeadersValue := strings.Join(allowHeaders, ", ")
 
 	return func(c *gin.Context) {
+		// OAuth discovery and public-client protocol endpoints use no browser
+		// session credentials. Keep this exception exact so consent and account
+		// management APIs retain the configured origin policy.
+		if method := publicMCPOAuthMethod(c.Request.URL.EscapedPath()); method != "" &&
+			(c.Request.Method == method || c.Request.Method == http.MethodOptions) {
+			if requested := c.GetHeader("Access-Control-Request-Method"); c.Request.Method == http.MethodOptions && requested != "" && requested != method {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Writer.Header().Del("Access-Control-Allow-Credentials")
+			c.Header("Access-Control-Allow-Headers", "Content-Type")
+			c.Header("Access-Control-Allow-Methods", method+", OPTIONS")
+			c.Header("Access-Control-Expose-Headers", "WWW-Authenticate")
+			c.Header("Access-Control-Max-Age", "86400")
+			if c.Request.Method == http.MethodOptions {
+				c.AbortWithStatus(http.StatusNoContent)
+				return
+			}
+			c.Next()
+			return
+		}
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
 		originAllowed := allowAll
 		if origin != "" && !allowAll {
@@ -90,7 +113,7 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 			c.Writer.Header().Set("Access-Control-Allow-Headers", allowHeadersValue)
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 			// The gateway relays this opaque state; browsers must read it for the next turn.
-			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag, Server-Timing, X-Codex-Turn-State")
+			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag, Server-Timing, WWW-Authenticate, X-Codex-Turn-State")
 			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 		}
 		// 处理预检请求
@@ -104,6 +127,17 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+func publicMCPOAuthMethod(path string) string {
+	switch path {
+	case "/.well-known/oauth-protected-resource/api/v1/mcp", "/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server":
+		return http.MethodGet
+	case "/api/v1/mcp/oauth/register", "/api/v1/mcp/oauth/token", "/api/v1/mcp/oauth/revoke":
+		return http.MethodPost
+	default:
+		return ""
 	}
 }
 
